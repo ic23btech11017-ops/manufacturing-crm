@@ -21,10 +21,10 @@ const defaultData = {
     { id: 2, client_id: 3, items: [{ description: "250ml Clear Vials", quantity: 15000, unit_price: 0.15 }], total_amount: 2250, status: "sent", created_at: "2026-04-20T10:00:00Z" }
   ],
   orders: [
-    { id: 1, client_id: 1, client_company: "RetailCo", product_details: "500ml Blue PET Bottles", quantity: 5000, deadline: "2026-04-30", status: "ready", quotation_id: 1 },
-    { id: 2, client_id: 2, client_company: "GlobalTech", product_details: "Custom Moulded Parts", quantity: 2000, deadline: "2026-04-25", status: "in_production" },
-    { id: 3, client_id: 2, client_company: "GlobalTech", product_details: "Precision Gears", quantity: 500, deadline: "2026-04-10", status: "in_production" },
-    { id: 4, client_id: 3, client_company: "MediPack Inc.", product_details: "Sterile Caps", quantity: 10000, deadline: "2026-05-15", status: "planned" }
+    { id: 1, client_id: 1, client_company: "RetailCo", product_details: "500ml Blue PET Bottles", quantity: 5000, deadline: "2026-04-30", status: "ready", quotation_id: 1, created_at: "2026-04-09T10:00:00Z" },
+    { id: 2, client_id: 2, client_company: "GlobalTech", product_details: "Custom Moulded Parts", quantity: 2000, deadline: "2026-04-25", status: "in_production", created_at: "2026-04-14T10:00:00Z" },
+    { id: 3, client_id: 2, client_company: "GlobalTech", product_details: "Precision Gears", quantity: 500, deadline: "2026-04-10", status: "in_production", created_at: "2026-04-04T10:00:00Z" },
+    { id: 4, client_id: 3, client_company: "MediPack Inc.", product_details: "Sterile Caps", quantity: 10000, deadline: "2026-05-15", status: "planned", created_at: "2026-04-20T10:00:00Z" }
   ],
   inventory: [
     { id: 1, sku: "RAW-PET-01", name: "PET Resin Pellets (High Grade)", category: "raw", quantity: 1200, unit: "kg", cost: 1.20, reorder_point: 1500, last_updated: "2026-04-20T10:00:00Z" },
@@ -283,13 +283,20 @@ apiRouter.get('/orders', async (req, res) => {
     const db = await readDB();
     const ordersWithClient = db.orders.map((o: any) => {
       const client = db.clients.find((c: any) => c.id === o.client_id) || {};
+      const fallbackCreatedAt = o.deadline ? new Date(`${o.deadline}T00:00:00Z`).toISOString() : null;
+
       return {
         ...o,
+        created_at: o.created_at || fallbackCreatedAt,
         client_company: client.company || 'Unknown',
         client_name: client.name || 'Unknown'
       };
     });
-    ordersWithClient.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    ordersWithClient.sort((a: any, b: any) => {
+      const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+      return (Number.isNaN(timeB) ? 0 : timeB) - (Number.isNaN(timeA) ? 0 : timeA);
+    });
     res.json(ordersWithClient);
   } catch (err) {
     res.status(500).json({ error: String(err) });

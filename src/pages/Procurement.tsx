@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Truck, Store, CheckCircle, PackagePlus, Plus } from 'lucide-react';
+import { Truck, Store } from 'lucide-react';
 import clsx from 'clsx';
-import { format } from 'date-fns';
+import { fetchJsonArray, getResponseError } from '../utils/api';
 
 export default function Procurement() {
   const [suppliers, setSuppliers] = useState<any[]>([]);
@@ -9,6 +9,7 @@ export default function Procurement() {
   const [inventory, setInventory] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'pos' | 'suppliers'>('pos');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const [isPoModalOpen, setIsPoModalOpen] = useState(false);
   const [poForm, setPoForm] = useState({ supplier_id: '', required_sku: '', quantity: '', expected_cost: '' });
@@ -21,20 +22,46 @@ export default function Procurement() {
   }, []);
 
   const fetchData = async () => {
-    try {
-      const [sRes, pRes, iRes] = await Promise.all([
-        fetch('/api/procurement/suppliers'),
-        fetch('/api/procurement/pos'),
-        fetch('/api/inventory')
-      ]);
-      setSuppliers(Array.isArray(await sRes.clone().json()) ? await sRes.json() : []);
-      setPos(Array.isArray(await pRes.clone().json()) ? await pRes.json() : []);
-      setInventory(Array.isArray(await iRes.clone().json()) ? await iRes.json() : []);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
+    setLoading(true);
+
+    const [supplierResult, poResult, inventoryResult] = await Promise.allSettled([
+      fetchJsonArray<any>('/api/procurement/suppliers'),
+      fetchJsonArray<any>('/api/procurement/pos'),
+      fetchJsonArray<any>('/api/inventory')
+    ]);
+
+    const failedSources: string[] = [];
+
+    if (supplierResult.status === 'fulfilled') {
+      setSuppliers(supplierResult.value);
+    } else {
+      console.error('Procurement suppliers fetch failed:', supplierResult.reason);
+      setSuppliers([]);
+      failedSources.push('suppliers');
     }
+
+    if (poResult.status === 'fulfilled') {
+      setPos(poResult.value);
+    } else {
+      console.error('Procurement PO fetch failed:', poResult.reason);
+      setPos([]);
+      failedSources.push('purchase orders');
+    }
+
+    if (inventoryResult.status === 'fulfilled') {
+      setInventory(inventoryResult.value);
+    } else {
+      console.error('Procurement inventory fetch failed:', inventoryResult.reason);
+      setInventory([]);
+      failedSources.push('inventory');
+    }
+
+    setError(
+      failedSources.length > 0
+        ? `Some procurement data could not be loaded (${failedSources.join(', ')}).`
+        : null
+    );
+    setLoading(false);
   };
 
   const handleCreateSupplier = async (e: React.FormEvent) => {
@@ -49,9 +76,12 @@ export default function Procurement() {
         setIsSupModalOpen(false);
         setSupForm({ name: '', email: '', phone: '' });
         fetchData();
+      } else {
+        alert(await getResponseError(res, 'Failed to create supplier.'));
       }
     } catch (err) {
       console.error(err);
+      alert('Failed to create supplier.');
     }
   };
 
@@ -67,9 +97,12 @@ export default function Procurement() {
         setIsPoModalOpen(false);
         setPoForm({ supplier_id: '', required_sku: '', quantity: '', expected_cost: '' });
         fetchData();
+      } else {
+        alert(await getResponseError(res, 'Failed to create purchase order.'));
       }
     } catch (err) {
       console.error(err);
+      alert('Failed to create purchase order.');
     }
   };
 
@@ -77,9 +110,14 @@ export default function Procurement() {
     if (!confirm('Receive Goods? This will instantly add stock to Inventory and log the Stock Movement inward.')) return;
     try {
       const res = await fetch(`/api/procurement/pos/${id}/receive`, { method: 'POST' });
-      if (res.ok) fetchData();
+      if (res.ok) {
+        fetchData();
+      } else {
+        alert(await getResponseError(res, 'Failed to receive goods.'));
+      }
     } catch (err) {
       console.error(err);
+      alert('Failed to receive goods.');
     }
   };
 
@@ -118,6 +156,12 @@ export default function Procurement() {
           </div>
         </div>
 
+        {error && (
+          <div className="border-b border-amber-100 bg-amber-50 px-6 py-3 text-sm font-medium text-amber-800">
+            {error}
+          </div>
+        )}
+
         <div className="overflow-x-auto">
           {activeTab === 'pos' ? (
             <table className="min-w-full divide-y divide-slate-200">
@@ -131,6 +175,13 @@ export default function Procurement() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-slate-200">
+                {loading && (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-8 text-center text-slate-500">
+                      Loading purchase orders...
+                    </td>
+                  </tr>
+                )}
                 {pos.map(po => {
                   const supplier = suppliers.find(s => s.id === po.supplier_id);
                   return (
@@ -142,12 +193,19 @@ export default function Procurement() {
                         <div className="text-xs text-slate-500">Est Cost: ${po.expected_cost}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={clsx("px-2.5 py-1 rounded-full text-[11px] font-bold uppercase", po.status === 'received' ? "bg-slate-100 border border-slate-200 text-slate-700" : "bg-slate-100 border border-slate-200 text-slate-700")}>
+                        <span className={clsx(
+                          "px-2.5 py-1 rounded-full text-[11px] font-bold uppercase",
+                          po.status === 'received'
+                            ? "bg-slate-100 border border-slate-200 text-slate-700"
+                            : po.status === 'approved'
+                              ? "bg-blue-50 border border-blue-100 text-blue-700"
+                              : "bg-amber-50 border border-amber-100 text-amber-700"
+                        )}>
                           {po.status}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
-                        {po.status === 'draft' && (
+                        {po.status !== 'received' && (
                           <button onClick={() => completePo(po.id)} className="bg-slate-900 text-white px-3 py-1.5 rounded text-xs font-bold hover:bg-slate-800">
                             Receive Goods
                           </button>
@@ -159,7 +217,7 @@ export default function Procurement() {
                     </tr>
                   )
                 })}
-                {pos.length === 0 && <tr><td colSpan={5} className="px-6 py-8 text-center text-slate-500">No Purchase Orders found.</td></tr>}
+                {!loading && pos.length === 0 && <tr><td colSpan={5} className="px-6 py-8 text-center text-slate-500">No Purchase Orders found.</td></tr>}
               </tbody>
             </table>
           ) : (
@@ -171,6 +229,13 @@ export default function Procurement() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-slate-200">
+                {loading && (
+                  <tr>
+                    <td colSpan={2} className="px-6 py-8 text-center text-slate-500">
+                      Loading suppliers...
+                    </td>
+                  </tr>
+                )}
                 {suppliers.map(sup => (
                   <tr key={sup.id} className="hover:bg-slate-50">
                     <td className="px-6 py-4 whitespace-nowrap font-bold text-slate-900">{sup.name}</td>
@@ -180,7 +245,7 @@ export default function Procurement() {
                     </td>
                   </tr>
                 ))}
-                {suppliers.length === 0 && <tr><td colSpan={3} className="px-6 py-8 text-center text-slate-500">No Suppliers found.</td></tr>}
+                {!loading && suppliers.length === 0 && <tr><td colSpan={2} className="px-6 py-8 text-center text-slate-500">No Suppliers found.</td></tr>}
               </tbody>
             </table>
           )}

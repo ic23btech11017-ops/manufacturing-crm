@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Settings, Play, CheckCircle, Search, Layers, ClipboardList } from 'lucide-react';
 import clsx from 'clsx';
 import { format } from 'date-fns';
+import { fetchJsonArray, getResponseError } from '../utils/api';
 
 type BOM = {
   id: number;
@@ -15,9 +16,11 @@ type BOM = {
     id: number;
     bom_id: number;
     target_quantity: number;
-    status: 'planned' | 'in_progress' | 'completed';
-    created_at: string;
-    completed_at?: string;
+  status: 'planned' | 'in_progress' | 'completed';
+  created_at: string;
+  completed_at?: string;
+  actual_yield?: number;
+  wastage?: number;
   };
 
 type InventoryItem = {
@@ -35,6 +38,7 @@ export default function Production() {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'work_orders' | 'boms'>('work_orders');
+  const [error, setError] = useState<string | null>(null);
 
   // Modals
   const [isWbModalOpen, setIsWbModalOpen] = useState(false);
@@ -50,20 +54,46 @@ export default function Production() {
   }, []);
 
   const fetchData = async () => {
-    try {
-      const [bRes, wRes, iRes] = await Promise.all([
-        fetch('/api/production/boms'),
-        fetch('/api/production/work-orders'),
-        fetch('/api/inventory')
-      ]);
-      setBoms(Array.isArray(await bRes.clone().json()) ? await bRes.json() : []);
-      setWorkOrders(Array.isArray(await wRes.clone().json()) ? await wRes.json() : []);
-      setInventory(Array.isArray(await iRes.clone().json()) ? await iRes.json() : []);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
+    setLoading(true);
+
+    const [bomResult, workOrderResult, inventoryResult] = await Promise.allSettled([
+      fetchJsonArray<BOM>('/api/production/boms'),
+      fetchJsonArray<WorkOrder>('/api/production/work-orders'),
+      fetchJsonArray<InventoryItem>('/api/inventory')
+    ]);
+
+    const failedSources: string[] = [];
+
+    if (bomResult.status === 'fulfilled') {
+      setBoms(bomResult.value);
+    } else {
+      console.error('Production BOM fetch failed:', bomResult.reason);
+      setBoms([]);
+      failedSources.push('BOMs');
     }
+
+    if (workOrderResult.status === 'fulfilled') {
+      setWorkOrders(workOrderResult.value);
+    } else {
+      console.error('Production work order fetch failed:', workOrderResult.reason);
+      setWorkOrders([]);
+      failedSources.push('work orders');
+    }
+
+    if (inventoryResult.status === 'fulfilled') {
+      setInventory(inventoryResult.value);
+    } else {
+      console.error('Production inventory fetch failed:', inventoryResult.reason);
+      setInventory([]);
+      failedSources.push('inventory');
+    }
+
+    setError(
+      failedSources.length > 0
+        ? `Some production data could not be loaded (${failedSources.join(', ')}).`
+        : null
+    );
+    setLoading(false);
   };
 
   const handleCreateWO = async (e: React.FormEvent) => {
@@ -78,9 +108,12 @@ export default function Production() {
         setIsWbModalOpen(false);
         setWoForm({ bom_id: '', target_quantity: '' });
         fetchData();
+      } else {
+        alert(await getResponseError(res, 'Failed to create work order.'));
       }
     } catch (err) {
       console.error(err);
+      alert('Failed to create work order.');
     }
   };
 
@@ -105,9 +138,12 @@ export default function Production() {
         setBomForm({ finished_sku: '', name: '' });
         setBomComponents([{ sku: '', quantity_required: '' }]);
         fetchData();
+      } else {
+        alert(await getResponseError(res, 'Failed to create BOM.'));
       }
     } catch (err) {
       console.error(err);
+      alert('Failed to create BOM.');
     }
   };
 
@@ -118,11 +154,10 @@ export default function Production() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status })
       });
-      const data = await res.json();
       if (res.ok) {
         fetchData();
       } else {
-        alert(data.error || 'Failed to update status');
+        alert(await getResponseError(res, 'Failed to update status.'));
       }
     } catch (err) {
       console.error(err);
@@ -149,9 +184,14 @@ export default function Production() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      if (res.ok) fetchData();
+      if (res.ok) {
+        fetchData();
+      } else {
+        alert(await getResponseError(res, 'Failed to complete work order.'));
+      }
     } catch (err) {
       console.error(err);
+      alert('Failed to complete work order.');
     }
   };
 
@@ -193,10 +233,18 @@ export default function Production() {
           </div>
         </div>
 
+        {error && (
+          <div className="border-b border-amber-100 bg-amber-50 px-6 py-3 text-sm font-medium text-amber-800">
+            {error}
+          </div>
+        )}
+
         <div className="p-6">
           {activeTab === 'work_orders' ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {workOrders.length === 0 ? (
+              {loading ? (
+                <div className="col-span-full text-center py-12 text-slate-500">Loading work orders...</div>
+              ) : workOrders.length === 0 ? (
                 <div className="col-span-full text-center py-12 text-slate-500">No active work orders.</div>
               ) : (
                 workOrders.map((wo) => {
@@ -249,7 +297,9 @@ export default function Production() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {boms.length === 0 ? (
+              {loading ? (
+                <div className="col-span-full text-center py-12 text-slate-500">Loading BOMs...</div>
+              ) : boms.length === 0 ? (
                 <div className="col-span-full text-center py-12 text-slate-500">No BOMs configured yet.</div>
               ) : (
                 boms.map((bom) => (

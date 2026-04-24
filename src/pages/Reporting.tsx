@@ -1,24 +1,50 @@
 import React, { useState, useEffect } from 'react';
 import { BarChart3, TrendingUp, PieChart, Activity, Download } from 'lucide-react';
-import clsx from 'clsx';
-// A complete system should probably have a charting library like Recharts
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, LineChart, Line, PieChart as RechartsPieChart, Pie, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart as RechartsPieChart, Pie, Cell } from 'recharts';
+import { fetchJsonArray } from '../utils/api';
 
 export default function Reporting() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // We can simulate an aggregated reports endpoint, or fetch from existing ones
-    // For a demo-ready dashboard, we will aggregate a few stats.
-    Promise.all([
-      fetch('/api/orders').then(r => r.json()),
-      fetch('/api/inventory').then(r => r.json()),
-      fetch('/api/quality').then(r => r.json())
-    ]).then(([orders, inventory, quality]) => {
-      
+    const loadReportData = async () => {
+      const [ordersResult, inventoryResult, qualityResult] = await Promise.allSettled([
+        fetchJsonArray<any>('/api/orders'),
+        fetchJsonArray<any>('/api/inventory'),
+        fetchJsonArray<any>('/api/quality')
+      ]);
+
+      const errors: string[] = [];
+      const orders = ordersResult.status === 'fulfilled' ? ordersResult.value : [];
+      const inventory = inventoryResult.status === 'fulfilled' ? inventoryResult.value : [];
+      const quality = qualityResult.status === 'fulfilled' ? qualityResult.value : [];
+
+      if (ordersResult.status === 'rejected') {
+        console.error('Reporting orders fetch failed:', ordersResult.reason);
+        errors.push('orders');
+      }
+
+      if (inventoryResult.status === 'rejected') {
+        console.error('Reporting inventory fetch failed:', inventoryResult.reason);
+        errors.push('inventory');
+      }
+
+      if (qualityResult.status === 'rejected') {
+        console.error('Reporting quality fetch failed:', qualityResult.reason);
+        errors.push('quality');
+      }
+
       const ordersByMonth = orders.reduce((acc: any, order: any) => {
-        const month = new Date(order.created_at).toLocaleString('default', { month: 'short' });
+        const sourceDate = order.created_at || order.deadline;
+        const parsedDate = sourceDate ? new Date(sourceDate) : null;
+
+        if (!parsedDate || Number.isNaN(parsedDate.getTime())) {
+          return acc;
+        }
+
+        const month = parsedDate.toLocaleString('default', { month: 'short' });
         if (!acc[month]) acc[month] = { name: month, orders: 0 };
         acc[month].orders += 1;
         return acc;
@@ -39,16 +65,28 @@ export default function Reporting() {
         qualityPassRate: passRate,
         totalOrders: orders.length
       });
+      setError(errors.length > 0 ? `Some report data could not be loaded (${errors.join(', ')}).` : null);
       setLoading(false);
-    });
+    };
 
+    loadReportData();
   }, []);
-
-  const COLORS = ['#000000', '#333333', '#666666', '#cccccc'];
 
   if (loading) {
     return <div className="p-8 text-center text-slate-500 animate-pulse font-medium">Generating Analytics...</div>;
   }
+
+  const smallestSliceIndex = data?.inventoryByCategory?.length
+    ? data.inventoryByCategory.reduce(
+        (smallestIndex: number, category: any, index: number, categories: any[]) =>
+          category.value < categories[smallestIndex].value ? index : smallestIndex,
+        0
+      )
+    : -1;
+
+  const pieColors = data?.inventoryByCategory?.map((_: any, index: number) =>
+    index === smallestSliceIndex ? '#2563eb' : '#020617'
+  ) ?? [];
 
   return (
     <div className="space-y-6">
@@ -61,6 +99,12 @@ export default function Reporting() {
           <Download className="w-4 h-4" /> Export Report
         </button>
       </div>
+
+      {error && (
+        <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+          {error}
+        </div>
+      )}
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -113,10 +157,11 @@ export default function Reporting() {
                   outerRadius={100}
                   paddingAngle={5}
                   dataKey="value"
-                  stroke="none"
+                  stroke="#ffffff"
+                  strokeWidth={3}
                 >
                   {data?.inventoryByCategory.map((entry:any, index:number) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    <Cell key={`cell-${index}`} fill={pieColors[index]} />
                   ))}
                 </Pie>
                 <RechartsTooltip formatter={(value: number) => `$${value.toLocaleString()}`} contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} />
@@ -127,7 +172,7 @@ export default function Reporting() {
             {data?.inventoryByCategory.map((category:any, idx:number) => (
                <div key={idx} className="flex justify-between items-center text-sm">
                  <div className="flex items-center gap-2 font-medium text-slate-600">
-                   <div className="w-3 h-3 rounded-sm" style={{backgroundColor: COLORS[idx % COLORS.length]}}></div>
+                   <div className="w-3 h-3 rounded-sm" style={{backgroundColor: pieColors[idx]}}></div>
                    {category.name}
                  </div>
                  <div className="font-bold text-slate-900">${category.value.toLocaleString(undefined, {maximumFractionDigits: 0})}</div>
