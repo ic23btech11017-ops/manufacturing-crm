@@ -50,7 +50,11 @@ export async function fetchJsonArray<T>(input: string, init?: RequestInit): Prom
     throw new Error(extractErrorMessage(payload, `Request failed with status ${response.status}`));
   }
 
-  return Array.isArray(payload) ? (payload as T[]) : [];
+  if (!Array.isArray(payload)) {
+    throw new Error(`Expected an array response from ${input}, but received ${payload === null ? 'an empty response' : typeof payload}.`);
+  }
+
+  return payload as T[];
 }
 
 export async function getResponseError(response: Response, fallback: string) {

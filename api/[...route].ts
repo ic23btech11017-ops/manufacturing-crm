@@ -3,11 +3,7 @@ import cors from 'cors';
 import path from 'path';
 import fs from 'fs/promises';
 
-// Only use these in local dev
-let DATA_FILE = '';
-if (!process.env.VERCEL) {
-  DATA_FILE = path.join(process.cwd(), 'data.json');
-}
+const DATA_FILE = path.join(process.cwd(), 'data.json');
 
 // Default initial data structure
 const defaultData = {
@@ -73,20 +69,26 @@ const defaultData = {
 // Database helper functions - IN MEMORY FOR VERCEL
 let dbInMemory: any = null;
 
+function getSeedData() {
+  return structuredClone(defaultData);
+}
+
 async function readDB() {
   if (dbInMemory) return dbInMemory;
-  if (process.env.VERCEL) {
-    dbInMemory = defaultData;
-    return dbInMemory;
-  }
   try {
     const data = await fs.readFile(DATA_FILE, 'utf-8');
     dbInMemory = JSON.parse(data);
     return dbInMemory;
   } catch (error: any) {
-    console.warn("Could not read data.json, falling back to default memory data:", error.message);
-    await writeDB(defaultData);
-    return defaultData;
+    console.warn(`Could not read ${DATA_FILE}, falling back to bundled seed data:`, error.message);
+    const seedData = getSeedData();
+    dbInMemory = seedData;
+
+    if (!process.env.VERCEL) {
+      await writeDB(seedData);
+    }
+
+    return dbInMemory;
   }
 }
 

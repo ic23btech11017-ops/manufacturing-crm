@@ -3,6 +3,7 @@ import { Settings, Play, CheckCircle, Search, Layers, ClipboardList } from 'luci
 import clsx from 'clsx';
 import { format } from 'date-fns';
 import { fetchJsonArray, getResponseError } from '../utils/api';
+import { actionButtonStyles, statusToneStyles } from '../utils/ui';
 
 type BOM = {
   id: number;
@@ -257,9 +258,9 @@ export default function Production() {
                           <h4 className="font-bold text-slate-900 mt-0.5">{bom?.name || 'Unknown BOM'}</h4>
                         </div>
                         <span className={clsx("px-2.5 py-1 rounded-full text-[11px] font-bold uppercase", 
-                          wo.status === 'completed' ? "bg-slate-100 border border-slate-200 text-slate-700" : 
-                          wo.status === 'in_progress' ? "bg-slate-100 border border-slate-200 text-slate-700" : 
-                          "bg-slate-100 text-blue-700"
+                          wo.status === 'completed' ? statusToneStyles.completed : 
+                          wo.status === 'in_progress' ? statusToneStyles.in_progress : 
+                          statusToneStyles.planned
                         )}>
                           {wo.status.replace('_', ' ')}
                         </span>
@@ -277,15 +278,24 @@ export default function Production() {
 
                       <div className="mt-auto pt-4 border-t border-slate-100">
                         {wo.status === 'planned' ? (
-                          <button onClick={() => changeWorkOrderStatus(wo.id, 'in_progress')} className="w-full py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-colors">
+                          <button
+                            onClick={() => changeWorkOrderStatus(wo.id, 'in_progress')}
+                            className={clsx("w-full py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2", actionButtonStyles.info)}
+                          >
                             <Play className="w-4 h-4" /> Start Production
                           </button>
                         ) : wo.status === 'in_progress' ? (
-                          <button onClick={() => completeWorkOrder(wo.id)} className="w-full py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-colors shadow-sm">
+                          <button
+                            onClick={() => completeWorkOrder(wo.id)}
+                            className={clsx("w-full py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2", actionButtonStyles.success)}
+                          >
                             <CheckCircle className="w-4 h-4" /> Finish & Run Deductions
                           </button>
                         ) : (
-                          <button onClick={() => alert(`Batch Trace Link\nWO ID: ${wo.id}\nTarget: ${wo.target_quantity}\nYield: ${wo.actual_yield}\nRaw Materials Consumed: View full stock movements tab for WO-${wo.id}`)} className="w-full py-2 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-colors">
+                          <button
+                            onClick={() => alert(`Batch Trace Link\nWO ID: ${wo.id}\nTarget: ${wo.target_quantity}\nYield: ${wo.actual_yield}\nRaw Materials Consumed: View full stock movements tab for WO-${wo.id}`)}
+                            className={clsx("w-full py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2", actionButtonStyles.neutral)}
+                          >
                             <CheckCircle className="w-4 h-4 text-slate-600" /> Trace Batch #{wo.id}
                           </button>
                         )}
@@ -409,7 +419,11 @@ export default function Production() {
                           setBomComponents(newComps);
                         }} />
                       </div>
-                      <button type="button" onClick={() => setBomComponents(bomComponents.filter((_, i) => i !== index))} className="p-2 bg-red-50 text-slate-900 rounded hover:bg-slate-100 border border-slate-200">
+                      <button
+                        type="button"
+                        onClick={() => setBomComponents(bomComponents.filter((_, i) => i !== index))}
+                        className={clsx("p-2 rounded", actionButtonStyles.danger)}
+                      >
                         X
                       </button>
                     </div>

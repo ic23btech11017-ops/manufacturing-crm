@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Check, X, ArrowRight } from 'lucide-react';
 import { format } from 'date-fns';
 import clsx from 'clsx';
+import { actionButtonStyles, statusToneStyles } from '../utils/ui';
 
 type Client = {
   id: number;
@@ -114,10 +115,11 @@ export default function Quotations() {
   };
 
   const statusColors: Record<string, string> = {
-    pending: 'bg-yellow-100 text-yellow-800',
-    sent: 'bg-slate-100 text-slate-800',
-    approved: 'bg-slate-100 border border-slate-200 text-slate-800',
-    rejected: 'bg-slate-100 border border-slate-200 text-slate-800'
+    pending: statusToneStyles.pending,
+    sent: statusToneStyles.sent,
+    approved: statusToneStyles.approved,
+    accepted: statusToneStyles.accepted,
+    rejected: statusToneStyles.rejected
   };
 
   return (
@@ -175,22 +177,31 @@ export default function Quotations() {
               
               <div className="bg-gray-50 px-5 py-3 border-t border-gray-200 flex gap-2 overflow-x-auto">
                 {quote.status === 'pending' && (
-                  <button onClick={() => updateStatus(quote.id, 'sent')} className="text-xs font-medium text-slate-900 hover:text-slate-800 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-md flex-1 text-center">
+                  <button
+                    onClick={() => updateStatus(quote.id, 'sent')}
+                    className={clsx("text-xs font-medium px-3 py-1.5 rounded-md flex-1 text-center", actionButtonStyles.info)}
+                  >
                     Mark Sent
                   </button>
                 )}
                 {quote.status === 'sent' && (
                   <>
-                    <button onClick={() => convertToOrder(quote.id)} className="text-xs font-medium text-slate-700 bg-slate-100 border border-slate-200 hover:bg-slate-200 px-3 py-1.5 rounded-md flex-1 flex items-center justify-center gap-1">
+                    <button
+                      onClick={() => convertToOrder(quote.id)}
+                      className={clsx("text-xs font-medium px-3 py-1.5 rounded-md flex-1 flex items-center justify-center gap-1", actionButtonStyles.success)}
+                    >
                       <Check className="w-3 h-3" /> Approve & Order
                     </button>
-                    <button onClick={() => updateStatus(quote.id, 'rejected')} className="text-xs font-medium text-slate-700 bg-slate-100 border border-slate-200 hover:bg-slate-200 px-3 py-1.5 rounded-md flex items-center justify-center gap-1">
+                    <button
+                      onClick={() => updateStatus(quote.id, 'rejected')}
+                      className={clsx("text-xs font-medium px-3 py-1.5 rounded-md flex items-center justify-center gap-1", actionButtonStyles.danger)}
+                    >
                       <X className="w-3 h-3" />
                     </button>
                   </>
                 )}
-                {quote.status === 'approved' && (
-                  <div className="text-xs text-slate-700 font-medium flex items-center gap-1 w-full justify-center py-1.5">
+                {(quote.status === 'approved' || quote.status === 'accepted') && (
+                  <div className="text-xs text-green-800 font-medium flex items-center gap-1 w-full justify-center py-1.5">
                     <Check className="w-4 h-4" /> Converted to Order
                   </div>
                 )}

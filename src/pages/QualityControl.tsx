@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ShieldCheck, Crosshair, AlertTriangle, Check, X } from 'lucide-react';
 import clsx from 'clsx';
 import { format, parseISO } from 'date-fns';
+import { actionButtonStyles, statusToneStyles } from '../utils/ui';
 
 type QualityCheck = {
   id: number;
@@ -141,10 +142,13 @@ export default function QualityControl() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-slate-900">Work Order #{check.work_order_id}</td>
                     <td className="px-6 py-4 whitespace-nowrap font-mono text-sm text-slate-500">{check.item_sku}</td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="px-2.5 py-1 rounded-full text-[11px] font-bold uppercase bg-slate-100 border border-slate-200 text-slate-700">AWAITING QA</span>
+                      <span className={clsx("px-2.5 py-1 rounded-full text-[11px] font-bold uppercase", statusToneStyles.awaiting)}>AWAITING QA</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
-                      <button onClick={() => handleInspect(check)} className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-1.5 rounded text-xs font-bold transition-colors">
+                      <button
+                        onClick={() => handleInspect(check)}
+                        className={clsx("px-4 py-1.5 rounded text-xs font-bold", actionButtonStyles.info)}
+                      >
                         Inspect Batch
                       </button>
                     </td>
@@ -176,9 +180,9 @@ export default function QualityControl() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-slate-900">{check.defect_rate}%</td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {check.status === 'passed' ? (
-                         <span className="flex items-center gap-1 text-slate-700 font-bold text-xs"><Check className="w-4 h-4"/> PASSED</span>
+                         <span className={clsx("inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold uppercase", statusToneStyles.passed)}><Check className="w-4 h-4"/> PASSED</span>
                       ) : (
-                         <span className="flex items-center gap-1 text-slate-700 font-bold text-xs"><X className="w-4 h-4"/> FAILED</span>
+                         <span className={clsx("inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold uppercase", statusToneStyles.failed)}><X className="w-4 h-4"/> FAILED</span>
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600 truncate max-w-[200px]">{check.notes}</td>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Package, Plus, Search, AlertTriangle, Layers, Edit, Trash2, Download } from 'lucide-react';
 import clsx from 'clsx';
 import { format, parseISO } from 'date-fns';
+import { actionButtonStyles } from '../utils/ui';
 
 type InventoryItem = {
   id: number;
@@ -276,9 +277,23 @@ export default function Inventory() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
                         <div className="flex justify-end items-center gap-2">
-                          <button onClick={() => adjustStock(item.id, 10, 'deduct')} className="p-1 px-2 text-xs font-bold text-slate-600 bg-slate-50 hover:bg-slate-100 rounded border border-slate-200">-10</button>
-                          <button onClick={() => adjustStock(item.id, 10, 'add')} className="p-1 px-2 text-xs font-bold text-slate-600 bg-slate-50 hover:bg-slate-100 rounded border border-slate-200">+10</button>
-                          <button onClick={() => deleteItem(item.id)} className="p-1 ml-2 text-slate-900 hover:text-slate-700 transition-colors" title="Delete Item">
+                          <button
+                            onClick={() => adjustStock(item.id, 10, 'deduct')}
+                            className={clsx("p-1 px-2 text-xs font-bold rounded", actionButtonStyles.warning)}
+                          >
+                            -10
+                          </button>
+                          <button
+                            onClick={() => adjustStock(item.id, 10, 'add')}
+                            className={clsx("p-1 px-2 text-xs font-bold rounded", actionButtonStyles.successSubtle)}
+                          >
+                            +10
+                          </button>
+                          <button
+                            onClick={() => deleteItem(item.id)}
+                            className={clsx("p-1 ml-2 rounded", actionButtonStyles.danger)}
+                            title="Delete Item"
+                          >
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>

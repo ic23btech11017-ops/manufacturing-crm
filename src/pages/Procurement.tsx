@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Truck, Store } from 'lucide-react';
 import clsx from 'clsx';
 import { fetchJsonArray, getResponseError } from '../utils/api';
+import { actionButtonStyles, statusToneStyles } from '../utils/ui';
 
 export default function Procurement() {
   const [suppliers, setSuppliers] = useState<any[]>([]);
@@ -196,17 +197,20 @@ export default function Procurement() {
                         <span className={clsx(
                           "px-2.5 py-1 rounded-full text-[11px] font-bold uppercase",
                           po.status === 'received'
-                            ? "bg-slate-100 border border-slate-200 text-slate-700"
+                            ? statusToneStyles.received
                             : po.status === 'approved'
-                              ? "bg-blue-50 border border-blue-100 text-blue-700"
-                              : "bg-amber-50 border border-amber-100 text-amber-700"
+                              ? statusToneStyles.sent
+                              : statusToneStyles.draft
                         )}>
                           {po.status}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
                         {po.status !== 'received' && (
-                          <button onClick={() => completePo(po.id)} className="bg-slate-900 text-white px-3 py-1.5 rounded text-xs font-bold hover:bg-slate-800">
+                          <button
+                            onClick={() => completePo(po.id)}
+                            className={clsx("px-3 py-1.5 rounded text-xs font-bold", actionButtonStyles.success)}
+                          >
                             Receive Goods
                           </button>
                         )}
