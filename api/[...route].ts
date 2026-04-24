@@ -6,16 +6,8 @@ import fs from 'fs/promises';
 
 // Only use these in local dev
 let DATA_FILE = '';
-try {
-  // Use a fallback for Vercel CommonJS compilation to avoid import.meta.url crashes
-  if (!process.env.VERCEL) {
-    const { fileURLToPath } = await import('url');
-    const __filename = fileURLToPath(import.meta.url);
-    const __dirname = path.dirname(__filename);
-    DATA_FILE = path.join(__dirname, '../data.json');
-  }
-} catch (e) {
-  console.warn("Could not setup local file paths");
+if (!process.env.VERCEL) {
+  DATA_FILE = path.join(process.cwd(), 'data.json');
 }
 
 // Default initial data structure
@@ -754,23 +746,25 @@ app.get('/api/warehouses', async (req, res) => {
 
 // Vite middleware for local development
 if (!process.env.VERCEL) {
-  if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*all', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
-  }
+  (async () => {
+    if (process.env.NODE_ENV !== "production") {
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: "spa",
+      });
+      app.use(vite.middlewares);
+    } else {
+      const distPath = path.join(process.cwd(), 'dist');
+      app.use(express.static(distPath));
+      app.get('*all', (req, res) => {
+        res.sendFile(path.join(distPath, 'index.html'));
+      });
+    }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server running on http://localhost:${PORT}`);
+    });
+  })();
 }
 
 // Export the app for Vercel serverless
