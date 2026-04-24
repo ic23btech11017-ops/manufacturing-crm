@@ -121,6 +121,14 @@ const PORT = Number(process.env.PORT) || 3000;
 app.use(cors());
 app.use(express.json());
 
+// Fix for Vercel stripping the /api prefix
+app.use((req, res, next) => {
+  if (!req.url.startsWith('/api')) {
+    req.url = '/api' + (req.url === '/' ? '' : req.url);
+  }
+  next();
+});
+
 // Init DB file
 // await readDB(); // Removed top-level await to prevent Vercel initialization errors
 

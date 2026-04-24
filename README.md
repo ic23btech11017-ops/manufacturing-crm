@@ -1,20 +1,23 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# KALNET MOS - Manufacturing CRM
 
-# Run and deploy your AI Studio app
+A modern, production-ready Manufacturing CRM system built for KALNET.
 
-This contains everything you need to run your app locally.
+## Features
+- **Dashboard**: Real-time overview of orders, revenue, and production telemetry.
+- **Quotations**: Generate and track client quotes.
+- **Production Control**: Manage Bills of Materials (BOMs) and Work Orders.
+- **Inventory**: Track raw materials and finished goods.
+- **Procurement**: Manage suppliers and purchase orders.
+- **Quality Assurance**: Track defect rates and quality checks.
 
-View your app in AI Studio: https://ai.studio/apps/81ab75a6-3fc8-4479-9554-a3896384ddb9
+## Development
 
-## Run Locally
+Built with React, Vite, Tailwind CSS, and Express.
 
-**Prerequisites:**  Node.js
+```bash
+# Install dependencies
+npm install
 
-
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+# Run local development server
+npm run dev
+```
