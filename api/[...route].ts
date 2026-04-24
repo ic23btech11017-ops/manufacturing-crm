@@ -116,9 +116,11 @@ app.use(express.json());
 // Init DB file
 // await readDB(); // Removed top-level await to prevent Vercel initialization errors
 
+const apiRouter = express.Router();
+
 // --- API Routes ---
 
-app.get('/api/dashboard', async (req, res) => {
+apiRouter.get('/dashboard', async (req, res) => {
   try {
     const db = await readDB();
     const totalOrders = (db.orders || []).length;
@@ -153,7 +155,7 @@ app.get('/api/dashboard', async (req, res) => {
   }
 });
 
-app.get('/api/clients', async (req, res) => {
+apiRouter.get('/clients', async (req, res) => {
   try {
     const db = await readDB();
     const clients = [...db.clients].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
@@ -163,7 +165,7 @@ app.get('/api/clients', async (req, res) => {
   }
 });
 
-app.post('/api/clients', async (req, res) => {
+apiRouter.post('/clients', async (req, res) => {
   try {
     const { name, company, phone, email, industry, notes } = req.body;
     const db = await readDB();
@@ -187,7 +189,7 @@ app.post('/api/clients', async (req, res) => {
   }
 });
 
-app.get('/api/quotations', async (req, res) => {
+apiRouter.get('/quotations', async (req, res) => {
   try {
     const db = await readDB();
     const quotesWithClient = db.quotations.map((q: any) => {
@@ -205,7 +207,7 @@ app.get('/api/quotations', async (req, res) => {
   }
 });
 
-app.post('/api/quotations', async (req, res) => {
+apiRouter.post('/quotations', async (req, res) => {
   try {
     const { client_id, items, total_amount, status } = req.body;
     const db = await readDB();
@@ -227,7 +229,7 @@ app.post('/api/quotations', async (req, res) => {
   }
 });
 
-app.put('/api/quotations/:id/status', async (req, res) => {
+apiRouter.put('/quotations/:id/status', async (req, res) => {
   try {
     const { status } = req.body;
     const db = await readDB();
@@ -245,7 +247,7 @@ app.put('/api/quotations/:id/status', async (req, res) => {
   }
 });
 
-app.post('/api/orders/convert/:quotationId', async (req, res) => {
+apiRouter.post('/orders/convert/:quotationId', async (req, res) => {
   try {
     const quotationId = parseInt(req.params.quotationId, 10);
     const { deadline } = req.body;
@@ -277,7 +279,7 @@ app.post('/api/orders/convert/:quotationId', async (req, res) => {
   }
 });
 
-app.get('/api/orders', async (req, res) => {
+apiRouter.get('/orders', async (req, res) => {
   try {
     const db = await readDB();
     const ordersWithClient = db.orders.map((o: any) => {
@@ -295,7 +297,7 @@ app.get('/api/orders', async (req, res) => {
   }
 });
 
-app.put('/api/orders/:id/status', async (req, res) => {
+apiRouter.put('/orders/:id/status', async (req, res) => {
   try {
     const { status } = req.body;
     const db = await readDB();
@@ -313,7 +315,7 @@ app.put('/api/orders/:id/status', async (req, res) => {
   }
 });
 
-app.post('/api/orders/manual', async (req, res) => {
+apiRouter.post('/orders/manual', async (req, res) => {
   try {
     const { client_id, product_details, quantity, deadline } = req.body;
     const db = await readDB();
@@ -335,7 +337,7 @@ app.post('/api/orders/manual', async (req, res) => {
   }
 });
 
-app.get('/api/inventory', async (req, res) => {
+apiRouter.get('/inventory', async (req, res) => {
   try {
     const db = await readDB();
     res.json(db.inventory || []);
@@ -344,7 +346,7 @@ app.get('/api/inventory', async (req, res) => {
   }
 });
 
-app.post('/api/inventory', async (req, res) => {
+apiRouter.post('/inventory', async (req, res) => {
   try {
     const { sku, name, category, quantity, unit, reorder_point, cost } = req.body;
     const db = await readDB();
@@ -368,7 +370,7 @@ app.post('/api/inventory', async (req, res) => {
   }
 });
 
-app.put('/api/inventory/:id', async (req, res) => {
+apiRouter.put('/inventory/:id', async (req, res) => {
   try {
     const { quantity, action } = req.body;
     const db = await readDB();
@@ -407,7 +409,7 @@ app.put('/api/inventory/:id', async (req, res) => {
   }
 });
 
-app.delete('/api/inventory/:id', async (req, res) => {
+apiRouter.delete('/inventory/:id', async (req, res) => {
   try {
     const db = await readDB();
     const itemIndex = (db.inventory || []).findIndex((i: any) => i.id === parseInt(req.params.id, 10));
@@ -423,7 +425,7 @@ app.delete('/api/inventory/:id', async (req, res) => {
   }
 });
 
-app.get('/api/production/boms', async (req, res) => {
+apiRouter.get('/production/boms', async (req, res) => {
   try {
     const db = await readDB();
     res.json(db.boms || []);
@@ -432,7 +434,7 @@ app.get('/api/production/boms', async (req, res) => {
   }
 });
 
-app.post('/api/production/boms', async (req, res) => {
+apiRouter.post('/production/boms', async (req, res) => {
   try {
     const { finished_sku, name, components } = req.body;
     const db = await readDB();
@@ -452,7 +454,7 @@ app.post('/api/production/boms', async (req, res) => {
   }
 });
 
-app.get('/api/production/work-orders', async (req, res) => {
+apiRouter.get('/production/work-orders', async (req, res) => {
   try {
     const db = await readDB();
     res.json(db.work_orders || []);
@@ -461,7 +463,7 @@ app.get('/api/production/work-orders', async (req, res) => {
   }
 });
 
-app.post('/api/production/work-orders', async (req, res) => {
+apiRouter.post('/production/work-orders', async (req, res) => {
   try {
     const { bom_id, target_quantity } = req.body;
     const db = await readDB();
@@ -481,7 +483,7 @@ app.post('/api/production/work-orders', async (req, res) => {
   }
 });
 
-app.post('/api/production/work-orders/:id/complete', async (req, res) => {
+apiRouter.post('/production/work-orders/:id/complete', async (req, res) => {
   try {
     const { actual_yield } = req.body || {};
     const db = await readDB();
@@ -559,7 +561,7 @@ app.post('/api/production/work-orders/:id/complete', async (req, res) => {
   }
 });
 
-app.put('/api/production/work-orders/:id/status', async (req, res) => {
+apiRouter.put('/production/work-orders/:id/status', async (req, res) => {
   try {
     const { status } = req.body;
     const db = await readDB();
@@ -593,7 +595,7 @@ app.put('/api/production/work-orders/:id/status', async (req, res) => {
   }
 });
 
-app.get('/api/quality', async (req, res) => {
+apiRouter.get('/quality', async (req, res) => {
   try {
     const db = await readDB();
     res.json(db.quality_checks || []);
@@ -602,7 +604,7 @@ app.get('/api/quality', async (req, res) => {
   }
 });
 
-app.put('/api/quality/:id', async (req, res) => {
+apiRouter.put('/quality/:id', async (req, res) => {
   try {
     const { status, defect_rate, notes } = req.body;
     const db = await readDB();
@@ -623,7 +625,7 @@ app.put('/api/quality/:id', async (req, res) => {
   }
 });
 
-app.get('/api/procurement/suppliers', async (req, res) => {
+apiRouter.get('/procurement/suppliers', async (req, res) => {
   try {
     const db = await readDB();
     res.json(db.suppliers || []);
@@ -632,7 +634,7 @@ app.get('/api/procurement/suppliers', async (req, res) => {
   }
 });
 
-app.post('/api/procurement/suppliers', async (req, res) => {
+apiRouter.post('/procurement/suppliers', async (req, res) => {
   try {
     const { name, email, phone } = req.body;
     const db = await readDB();
@@ -650,7 +652,7 @@ app.post('/api/procurement/suppliers', async (req, res) => {
   }
 });
 
-app.get('/api/procurement/pos', async (req, res) => {
+apiRouter.get('/procurement/pos', async (req, res) => {
   try {
     const db = await readDB();
     res.json(db.purchase_orders || []);
@@ -659,7 +661,7 @@ app.get('/api/procurement/pos', async (req, res) => {
   }
 });
 
-app.post('/api/procurement/pos', async (req, res) => {
+apiRouter.post('/procurement/pos', async (req, res) => {
   try {
     const { supplier_id, required_sku, quantity, expected_cost } = req.body;
     const db = await readDB();
@@ -681,7 +683,7 @@ app.post('/api/procurement/pos', async (req, res) => {
   }
 });
 
-app.post('/api/procurement/pos/:id/receive', async (req, res) => {
+apiRouter.post('/procurement/pos/:id/receive', async (req, res) => {
   try {
     const db = await readDB();
     const poIndex = (db.purchase_orders || []).findIndex((po: any) => po.id === parseInt(req.params.id, 10));
@@ -718,7 +720,7 @@ app.post('/api/procurement/pos/:id/receive', async (req, res) => {
   }
 });
 
-app.get('/api/inventory/movements', async (req, res) => {
+apiRouter.get('/inventory/movements', async (req, res) => {
   try {
     const db = await readDB();
     res.json((db.stock_movements || []).sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
@@ -727,7 +729,7 @@ app.get('/api/inventory/movements', async (req, res) => {
   }
 });
 
-app.get('/api/warehouses', async (req, res) => {
+apiRouter.get('/warehouses', async (req, res) => {
   try {
     const db = await readDB();
     res.json(db.warehouses || []);
@@ -735,6 +737,9 @@ app.get('/api/warehouses', async (req, res) => {
     res.status(500).json({ error: String(err) });
   }
 });
+
+app.use('/api', apiRouter);
+app.use('/', apiRouter);
 
 // Vite middleware for local development
 if (!process.env.VERCEL) {
