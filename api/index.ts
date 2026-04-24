@@ -3,12 +3,20 @@ import cors from 'cors';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import fs from 'fs/promises';
-import { fileURLToPath } from 'url';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const DATA_FILE = path.join(__dirname, '../data.json');
+// Only use these in local dev
+let DATA_FILE = '';
+try {
+  // Use a fallback for Vercel CommonJS compilation to avoid import.meta.url crashes
+  if (!process.env.VERCEL) {
+    const { fileURLToPath } = await import('url');
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = path.dirname(__filename);
+    DATA_FILE = path.join(__dirname, '../data.json');
+  }
+} catch (e) {
+  console.warn("Could not setup local file paths");
+}
 
 // Default initial data structure
 const defaultData = {
@@ -76,6 +84,10 @@ let dbInMemory: any = null;
 
 async function readDB() {
   if (dbInMemory) return dbInMemory;
+  if (process.env.VERCEL) {
+    dbInMemory = defaultData;
+    return dbInMemory;
+  }
   try {
     const data = await fs.readFile(DATA_FILE, 'utf-8');
     dbInMemory = JSON.parse(data);
