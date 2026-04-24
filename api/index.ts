@@ -81,11 +81,9 @@ async function readDB() {
     dbInMemory = JSON.parse(data);
     return dbInMemory;
   } catch (error: any) {
-    if (error.code === 'ENOENT') {
-      await writeDB(defaultData);
-      return defaultData;
-    }
-    throw error;
+    console.warn("Could not read data.json, falling back to default memory data:", error.message);
+    await writeDB(defaultData);
+    return defaultData;
   }
 }
 
@@ -112,7 +110,7 @@ app.use(cors());
 app.use(express.json());
 
 // Init DB file
-await readDB();
+// await readDB(); // Removed top-level await to prevent Vercel initialization errors
 
 // --- API Routes ---
 
