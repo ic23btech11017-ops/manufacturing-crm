@@ -150,7 +150,7 @@ export default function Quotations() {
                   {quote.items && quote.items.map((item, idx) => (
                     <div key={idx} className="border-b border-gray-100 pb-2 mb-2 last:border-0">
                       <div className="text-sm font-semibold text-slate-800">{item.description}</div>
-                      <div className="text-sm text-slate-500">Qty: {item.quantity} units @ ${item.unit_price}/ea</div>
+                      <div className="text-sm text-slate-500">Qty: {item.quantity} units @ ₹{item.unit_price}/ea</div>
                     </div>
                   ))}
                   {!quote.items && quote.product_type && (
@@ -160,7 +160,7 @@ export default function Quotations() {
                     </div>
                   )}
                   <div className="text-sm font-bold text-gray-900 mt-3 pt-2 border-t block">
-                    Total Value: ${(quote.total_amount ?? quote.price ?? 0).toFixed(2)}
+                    Total Value: ₹{(quote.total_amount ?? quote.price ?? 0).toFixed(2)}
                   </div>
                 </div>
                 
@@ -239,7 +239,7 @@ export default function Quotations() {
                     }} />
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1">Unit Price ($) <span className="text-slate-900">*</span></label>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Unit Price (₹) <span className="text-slate-900">*</span></label>
                     <input required type="number" step="0.01" className="block w-full rounded-md border border-gray-300 py-2.5 px-3 focus:outline-none focus:ring-2 focus:ring-slate-900 sm:text-sm" value={formData.items[0].unit_price} onChange={e => {
                       const newItems = [...formData.items];
                       newItems[0].unit_price = e.target.value;
@@ -248,7 +248,7 @@ export default function Quotations() {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">Total Quote Amount ($) <span className="text-slate-900">*</span></label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Total Quote Amount (₹) <span className="text-slate-900">*</span></label>
                   <input required type="number" step="0.01" className="block w-full rounded-md border border-gray-300 py-2.5 px-3 focus:outline-none focus:ring-2 focus:ring-slate-900 sm:text-sm" value={formData.total_amount} onChange={e => setFormData({...formData, total_amount: e.target.value})} />
                 </div>
               </div>

@@ -17,6 +17,12 @@ export default function Dashboard() {
 
   const [loading, setLoading] = useState(true);
 
+  const formatChartValue = (value: number) =>
+    value.toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+
   useEffect(() => {
     const loadMetrics = async () => {
       setLoading(true);
@@ -84,10 +90,21 @@ export default function Dashboard() {
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eaeaea" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#666666', fontSize: 12}} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{fill: '#666666', fontSize: 12}} />
-                <RechartsTooltip contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} />
-                <Area type="monotone" dataKey="sales" stroke="#000000" strokeWidth={2} fillOpacity={1} fill="url(#colorSales)" />
-                <Area type="monotone" dataKey="production" stroke="#666666" strokeWidth={2} fillOpacity={1} fill="url(#colorProd)" />
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{fill: '#666666', fontSize: 12}}
+                  tickFormatter={(value: number) => formatChartValue(Number(value))}
+                />
+                <RechartsTooltip
+                  formatter={(value: number, name: string) => [
+                    formatChartValue(Number(value)),
+                    name === 'sales' ? 'Sales' : 'Production'
+                  ]}
+                  contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}}
+                />
+                <Area type="natural" dataKey="sales" stroke="#000000" strokeWidth={2} fillOpacity={1} fill="url(#colorSales)" />
+                <Area type="natural" dataKey="production" stroke="#666666" strokeWidth={2} fillOpacity={1} fill="url(#colorProd)" />
               </AreaChart>
             </ResponsiveContainer>
           </div>

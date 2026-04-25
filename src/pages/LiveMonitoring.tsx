@@ -137,27 +137,15 @@ export default function LiveMonitoring() {
         <div className="divide-y divide-slate-100">
           {machines.map((machine) => {
             const activeOrder = orders.find(o => o.id === machine.current_order_id);
-            
+            // Compact row, no icons
             return (
-              <div key={machine.id} className="p-6 flex flex-col md:flex-row items-center gap-6 hover:bg-slate-50 transition-colors">
-                <div className="flex items-center gap-4 min-w-[200px]">
-                  <div className={clsx("p-3 rounded-xl", 
-                    machine.status === 'running' ? 'bg-slate-100 border border-slate-200' :
-                    machine.status === 'warning' ? 'bg-slate-100 border border-slate-200' :
-                    machine.status === 'offline' ? 'bg-slate-100 border border-slate-200' : 'bg-gray-100'
-                  )}>
-                    {machine.status === 'running' && <Activity className="w-6 h-6 text-slate-700 animate-pulse" />}
-                    {machine.status === 'warning' && <AlertTriangle className="w-6 h-6 text-slate-700" />}
-                    {machine.status === 'offline' && <div className="w-6 h-6 text-slate-700 font-bold text-center">X</div>}
-                    {machine.status === 'idle' && <Clock className="w-6 h-6 text-gray-700" />}
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-slate-900">{machine.name}</h4>
-                    <span className="text-xs font-semibold text-slate-500">{machine.type}</span>
-                  </div>
+              <div key={machine.id} className="p-3 flex flex-col md:flex-row items-center gap-3 hover:bg-slate-50 transition-colors">
+                <div className="min-w-[140px]">
+                  <h4 className="font-bold text-slate-900 text-sm">{machine.name}</h4>
+                  <span className="text-xs font-semibold text-slate-500">{machine.type}</span>
                 </div>
 
-                <div className="flex-1 w-full grid grid-cols-2 md:grid-cols-4 gap-4 items-center">
+                <div className="flex-1 w-full grid grid-cols-2 md:grid-cols-4 gap-2 items-center text-xs">
                   <div>
                     <span className={clsx("px-2.5 py-1 text-xs font-semibold rounded-full border", statusColors[machine.status])}>
                       {machine.status.toUpperCase()}

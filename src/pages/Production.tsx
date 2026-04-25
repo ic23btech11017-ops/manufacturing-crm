@@ -43,6 +43,11 @@ type InventoryItem = {
 };
 
 export default function Production() {
+    // Custom modal state for trace and yield prompt
+    const [traceModal, setTraceModal] = useState<{ open: boolean, wo?: WorkOrder }>({ open: false });
+    const [yieldModal, setYieldModal] = useState<{ open: boolean, wo?: WorkOrder }>({ open: false });
+    const [yieldInput, setYieldInput] = useState('');
+    const [modalError, setModalError] = useState('');
   const [boms, setBoms] = useState<BOM[]>([]);
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
@@ -134,24 +139,47 @@ export default function Production() {
   };
 
   const completeWorkOrder = async (id: number) => {
-    const rawYield = prompt('Execute Work Order?\n\nPlease enter the ACTUAL yield out of Production (to trace wastage/loss). Leave blank to use target quantity:');
-    if (rawYield === null) return; // User cancelled
+    // Open custom modal for yield input
+    const wo = workOrders.find(w => w.id === id);
+    setYieldInput('');
+    setModalError('');
+    setYieldModal({ open: true, wo });
+  };
 
-    const payload: any = {};
-    if (rawYield.trim() !== '') {
-      payload.actual_yield = parseInt(rawYield, 10);
-      if (isNaN(payload.actual_yield)) {
-        alert('Invalid yield quantity');
+  // Handler for confirming yield modal
+  const handleYieldConfirm = async () => {
+    const id = yieldModal.wo?.id;
+    if (!id) return;
+    let actual_yield: number | undefined = undefined;
+    if (yieldInput.trim() !== '') {
+      actual_yield = parseInt(yieldInput, 10);
+      if (isNaN(actual_yield)) {
+        setModalError('Invalid yield quantity');
         return;
       }
     }
-
     try {
-      await completeDemoWorkOrder(id, payload.actual_yield);
+      await completeDemoWorkOrder(id, actual_yield);
+      setYieldModal({ open: false });
     } catch (err) {
-      console.error(err);
-      alert('Failed to complete work order.');
+      setModalError('Failed to complete work order.');
     }
+  };
+
+  // Handler for closing yield modal
+  const handleYieldCancel = () => {
+    setYieldModal({ open: false });
+    setModalError('');
+  };
+
+  // Handler for opening trace modal
+  const handleTraceModal = (wo: WorkOrder) => {
+    setTraceModal({ open: true, wo });
+  };
+
+  // Handler for closing trace modal
+  const handleTraceClose = () => {
+    setTraceModal({ open: false });
   };
 
   const finishedGoods = inventory.filter(i => i.category === 'finished');
@@ -251,11 +279,58 @@ export default function Production() {
                           </button>
                         ) : (
                           <button
-                            onClick={() => alert(`Batch Trace Link\nWO ID: ${wo.id}\nTarget: ${wo.target_quantity}\nYield: ${wo.actual_yield}\nRaw Materials Consumed: View full stock movements tab for WO-${wo.id}`)}
+                            onClick={() => handleTraceModal(wo)}
                             className={clsx("w-full py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2", actionButtonStyles.neutral)}
                           >
                             <CheckCircle className="w-4 h-4 text-slate-600" /> Trace Batch #{wo.id}
                           </button>
+                              {/* Yield Modal for Completing Work Order */}
+                              {yieldModal.open && (
+                                <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto">
+                                  <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={handleYieldCancel}></div>
+                                  <div className="relative z-10 bg-white rounded-xl shadow-2xl w-full max-w-md mx-4">
+                                    <div className="px-6 py-5 border-b border-slate-200">
+                                      <h3 className="text-xl font-bold text-slate-900">Execute Work Order</h3>
+                                      <p className="text-sm text-slate-500 mt-1">Please enter the <b>ACTUAL yield</b> out of Production (to trace wastage/loss). Leave blank to use target quantity.</p>
+                                    </div>
+                                    <div className="p-6 space-y-4">
+                                      <input
+                                        type="number"
+                                        className="block w-full rounded-md border border-slate-300 py-2.5 px-3 text-sm focus:ring-slate-900"
+                                        placeholder="Actual yield (leave blank for target)"
+                                        value={yieldInput}
+                                        onChange={e => setYieldInput(e.target.value)}
+                                      />
+                                      {modalError && <div className="text-sm text-red-600">{modalError}</div>}
+                                    </div>
+                                    <div className="bg-slate-50 px-6 py-4 flex justify-end gap-3 rounded-b-xl border-t border-slate-100">
+                                      <button type="button" onClick={handleYieldCancel} className="px-4 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-200 border border-slate-300 bg-white">Cancel</button>
+                                      <button type="button" onClick={handleYieldConfirm} className="px-5 py-2 rounded-lg text-sm font-medium text-white bg-slate-900 hover:bg-slate-800 shadow-sm">Confirm</button>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Trace Modal for Batch Trace Link */}
+                              {traceModal.open && (
+                                <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto">
+                                  <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={handleTraceClose}></div>
+                                  <div className="relative z-10 bg-white rounded-xl shadow-2xl w-full max-w-md mx-4">
+                                    <div className="px-6 py-5 border-b border-slate-200">
+                                      <h3 className="text-xl font-bold text-slate-900">Batch Trace Link</h3>
+                                    </div>
+                                    <div className="p-6 space-y-2">
+                                      <div className="text-sm text-slate-700 font-semibold">WO ID: {traceModal.wo?.id}</div>
+                                      <div className="text-sm text-slate-700">Target: {traceModal.wo?.target_quantity}</div>
+                                      <div className="text-sm text-slate-700">Yield: {traceModal.wo?.actual_yield ?? '-'}</div>
+                                      <div className="text-sm text-slate-700">Raw Materials Consumed: <span className="font-mono">View full stock movements tab for WO-{traceModal.wo?.id}</span></div>
+                                    </div>
+                                    <div className="bg-slate-50 px-6 py-4 flex justify-end gap-3 rounded-b-xl border-t border-slate-100">
+                                      <button type="button" onClick={handleTraceClose} className="px-4 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-200 border border-slate-300 bg-white">Close</button>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
                         )}
                       </div>
                     </div>

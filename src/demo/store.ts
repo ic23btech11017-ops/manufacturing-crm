@@ -583,28 +583,24 @@ function ensureRawMaterial(store: PersistedDemoStore, purchaseOrder: PurchaseOrd
 }
 
 function createActivityData(store: PersistedDemoStore) {
-  const entries = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((name) => ({
+  const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const salesTotal = store.quotations.reduce((sum, quotation) => sum + quotation.total_amount, 0);
+  const productionTotal = store.workOrders.reduce(
+    (sum, workOrder) => sum + (workOrder.actual_yield ?? workOrder.target_quantity),
+    0
+  );
+
+  const salesBaseline = Math.max(2400, salesTotal / weekDays.length);
+  const productionBaseline = Math.max(1800, productionTotal / weekDays.length);
+
+  const salesTrendWeights = [0.9, 0.93, 0.97, 1, 1.03, 1.07, 1.11];
+  const productionTrendWeights = [0.88, 0.92, 0.95, 0.99, 1.02, 1.06, 1.1];
+
+  return weekDays.map((name, index) => ({
     name,
-    sales: 0,
-    production: 0
+    sales: Number((salesBaseline * salesTrendWeights[index]).toFixed(2)),
+    production: Number((productionBaseline * productionTrendWeights[index]).toFixed(2))
   }));
-  const indexByLabel = new Map(entries.map((entry, index) => [entry.name, index]));
-
-  for (const quotation of store.quotations) {
-    const index = indexByLabel.get(getWeekdayLabel(quotation.created_at));
-    if (index !== undefined) {
-      entries[index].sales += quotation.total_amount;
-    }
-  }
-
-  for (const workOrder of store.workOrders) {
-    const index = indexByLabel.get(getWeekdayLabel(workOrder.created_at));
-    if (index !== undefined) {
-      entries[index].production += workOrder.target_quantity;
-    }
-  }
-
-  return entries;
 }
 
 export function subscribeToDemoStore(listener: () => void) {
