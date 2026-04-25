@@ -2,8 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { Settings, Play, CheckCircle, Search, Layers, ClipboardList } from 'lucide-react';
 import clsx from 'clsx';
 import { format } from 'date-fns';
-import { fetchJsonArray, getResponseError } from '../utils/api';
 import { actionButtonStyles, statusToneStyles } from '../utils/ui';
+import {
+  completeWorkOrder as completeDemoWorkOrder,
+  createBom,
+  createWorkOrder,
+  getBoms,
+  getInventory,
+  getWorkOrders,
+  subscribeToDemoStore,
+  updateWorkOrderStatus
+} from '../demo/store';
 
 type BOM = {
   id: number;
@@ -51,67 +60,43 @@ export default function Production() {
   const [bomComponents, setBomComponents] = useState([{ sku: '', quantity_required: '' }]);
 
   useEffect(() => {
-    fetchData();
+    void fetchData();
+
+    return subscribeToDemoStore(() => {
+      void fetchData();
+    });
   }, []);
 
   const fetchData = async () => {
     setLoading(true);
+    try {
+      const [bomData, workOrderData, inventoryData] = await Promise.all([
+        getBoms(),
+        getWorkOrders(),
+        getInventory()
+      ]);
 
-    const [bomResult, workOrderResult, inventoryResult] = await Promise.allSettled([
-      fetchJsonArray<BOM>('/api/production/boms'),
-      fetchJsonArray<WorkOrder>('/api/production/work-orders'),
-      fetchJsonArray<InventoryItem>('/api/inventory')
-    ]);
-
-    const failedSources: string[] = [];
-
-    if (bomResult.status === 'fulfilled') {
-      setBoms(bomResult.value);
-    } else {
-      console.error('Production BOM fetch failed:', bomResult.reason);
+      setBoms(bomData);
+      setWorkOrders(workOrderData);
+      setInventory(inventoryData);
+      setError(null);
+    } catch (err) {
+      console.error('Production demo data load failed:', err);
       setBoms([]);
-      failedSources.push('BOMs');
-    }
-
-    if (workOrderResult.status === 'fulfilled') {
-      setWorkOrders(workOrderResult.value);
-    } else {
-      console.error('Production work order fetch failed:', workOrderResult.reason);
       setWorkOrders([]);
-      failedSources.push('work orders');
-    }
-
-    if (inventoryResult.status === 'fulfilled') {
-      setInventory(inventoryResult.value);
-    } else {
-      console.error('Production inventory fetch failed:', inventoryResult.reason);
       setInventory([]);
-      failedSources.push('inventory');
+      setError('Production demo data could not be loaded.');
+    } finally {
+      setLoading(false);
     }
-
-    setError(
-      failedSources.length > 0
-        ? `Some production data could not be loaded (${failedSources.join(', ')}).`
-        : null
-    );
-    setLoading(false);
   };
 
   const handleCreateWO = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch('/api/production/work-orders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(woForm)
-      });
-      if (res.ok) {
-        setIsWbModalOpen(false);
-        setWoForm({ bom_id: '', target_quantity: '' });
-        fetchData();
-      } else {
-        alert(await getResponseError(res, 'Failed to create work order.'));
-      }
+      await createWorkOrder(woForm);
+      setIsWbModalOpen(false);
+      setWoForm({ bom_id: '', target_quantity: '' });
     } catch (err) {
       console.error(err);
       alert('Failed to create work order.');
@@ -126,22 +111,13 @@ export default function Production() {
         quantity_required: parseFloat(c.quantity_required)
       }));
 
-      const res = await fetch('/api/production/boms', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...bomForm,
-          components: validComponents
-        })
+      await createBom({
+        ...bomForm,
+        components: validComponents
       });
-      if (res.ok) {
-        setIsBomModalOpen(false);
-        setBomForm({ finished_sku: '', name: '' });
-        setBomComponents([{ sku: '', quantity_required: '' }]);
-        fetchData();
-      } else {
-        alert(await getResponseError(res, 'Failed to create BOM.'));
-      }
+      setIsBomModalOpen(false);
+      setBomForm({ finished_sku: '', name: '' });
+      setBomComponents([{ sku: '', quantity_required: '' }]);
     } catch (err) {
       console.error(err);
       alert('Failed to create BOM.');
@@ -150,19 +126,10 @@ export default function Production() {
 
   const changeWorkOrderStatus = async (id: number, status: string) => {
     try {
-      const res = await fetch(`/api/production/work-orders/${id}/status`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status })
-      });
-      if (res.ok) {
-        fetchData();
-      } else {
-        alert(await getResponseError(res, 'Failed to update status.'));
-      }
+      await updateWorkOrderStatus(id, status as WorkOrder['status']);
     } catch (err) {
       console.error(err);
-      alert('Error updating status');
+      alert(err instanceof Error ? err.message : 'Error updating status');
     }
   };
 
@@ -180,16 +147,7 @@ export default function Production() {
     }
 
     try {
-      const res = await fetch(`/api/production/work-orders/${id}/complete`, { 
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      if (res.ok) {
-        fetchData();
-      } else {
-        alert(await getResponseError(res, 'Failed to complete work order.'));
-      }
+      await completeDemoWorkOrder(id, payload.actual_yield);
     } catch (err) {
       console.error(err);
       alert('Failed to complete work order.');

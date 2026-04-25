@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Network, ArrowRightLeft, MapPin } from 'lucide-react';
 import clsx from 'clsx';
 import { format } from 'date-fns';
+import { getStockTransfers, getWarehouses, subscribeToDemoStore } from '../demo/store';
 
 type Warehouse = {
   id: number;
@@ -23,24 +24,19 @@ type StockTransfer = {
 export default function Warehouse() {
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [transfers, setTransfers] = useState<StockTransfer[]>([]);
-  const [loading, setLoading] = useState(true);
-  
-  // Dummy data implementation for now to build visual structure
+
   useEffect(() => {
-    fetch('/api/warehouses')
-      .then(r => r.json())
-      .then(data => {
-        setWarehouses(data);
-        if (data && data.length > 0) {
-          setTransfers([
-            { id: 1, from_warehouse_id: 1, to_warehouse_id: 2, item_sku: 'R-PB-1', quantity: 500, status: 'completed', requested_at: new Date(Date.now() - 86400000 * 2).toISOString() },
-            { id: 2, from_warehouse_id: 2, to_warehouse_id: 1, item_sku: 'F-PB-1', quantity: 120, status: 'pending', requested_at: new Date().toISOString() }
-          ]);
-        } else {
-          setTransfers([]);
-        }
-        setLoading(false);
-      });
+    const loadData = async () => {
+      const [warehouseData, transferData] = await Promise.all([getWarehouses(), getStockTransfers()]);
+      setWarehouses(Array.isArray(warehouseData) ? warehouseData : []);
+      setTransfers(Array.isArray(transferData) ? transferData : []);
+    };
+
+    void loadData();
+
+    return subscribeToDemoStore(() => {
+      void loadData();
+    });
   }, []);
 
   return (

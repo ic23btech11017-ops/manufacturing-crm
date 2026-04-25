@@ -1,8 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Truck, Store } from 'lucide-react';
 import clsx from 'clsx';
-import { fetchJsonArray, getResponseError } from '../utils/api';
 import { actionButtonStyles, statusToneStyles } from '../utils/ui';
+import {
+  createPurchaseOrder,
+  createSupplier,
+  getInventory,
+  getPurchaseOrders,
+  getSuppliers,
+  receivePurchaseOrder,
+  subscribeToDemoStore
+} from '../demo/store';
 
 export default function Procurement() {
   const [suppliers, setSuppliers] = useState<any[]>([]);
@@ -19,67 +27,43 @@ export default function Procurement() {
   const [supForm, setSupForm] = useState({ name: '', email: '', phone: '' });
 
   useEffect(() => {
-    fetchData();
+    void fetchData();
+
+    return subscribeToDemoStore(() => {
+      void fetchData();
+    });
   }, []);
 
   const fetchData = async () => {
     setLoading(true);
+    try {
+      const [supplierData, poData, inventoryData] = await Promise.all([
+        getSuppliers(),
+        getPurchaseOrders(),
+        getInventory()
+      ]);
 
-    const [supplierResult, poResult, inventoryResult] = await Promise.allSettled([
-      fetchJsonArray<any>('/api/procurement/suppliers'),
-      fetchJsonArray<any>('/api/procurement/pos'),
-      fetchJsonArray<any>('/api/inventory')
-    ]);
-
-    const failedSources: string[] = [];
-
-    if (supplierResult.status === 'fulfilled') {
-      setSuppliers(supplierResult.value);
-    } else {
-      console.error('Procurement suppliers fetch failed:', supplierResult.reason);
+      setSuppliers(supplierData);
+      setPos(poData);
+      setInventory(inventoryData);
+      setError(null);
+    } catch (err) {
+      console.error('Procurement demo data load failed:', err);
       setSuppliers([]);
-      failedSources.push('suppliers');
-    }
-
-    if (poResult.status === 'fulfilled') {
-      setPos(poResult.value);
-    } else {
-      console.error('Procurement PO fetch failed:', poResult.reason);
       setPos([]);
-      failedSources.push('purchase orders');
-    }
-
-    if (inventoryResult.status === 'fulfilled') {
-      setInventory(inventoryResult.value);
-    } else {
-      console.error('Procurement inventory fetch failed:', inventoryResult.reason);
       setInventory([]);
-      failedSources.push('inventory');
+      setError('Procurement demo data could not be loaded.');
+    } finally {
+      setLoading(false);
     }
-
-    setError(
-      failedSources.length > 0
-        ? `Some procurement data could not be loaded (${failedSources.join(', ')}).`
-        : null
-    );
-    setLoading(false);
   };
 
   const handleCreateSupplier = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch('/api/procurement/suppliers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(supForm)
-      });
-      if (res.ok) {
-        setIsSupModalOpen(false);
-        setSupForm({ name: '', email: '', phone: '' });
-        fetchData();
-      } else {
-        alert(await getResponseError(res, 'Failed to create supplier.'));
-      }
+      await createSupplier(supForm);
+      setIsSupModalOpen(false);
+      setSupForm({ name: '', email: '', phone: '' });
     } catch (err) {
       console.error(err);
       alert('Failed to create supplier.');
@@ -89,18 +73,9 @@ export default function Procurement() {
   const handleCreatePo = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch('/api/procurement/pos', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(poForm)
-      });
-      if (res.ok) {
-        setIsPoModalOpen(false);
-        setPoForm({ supplier_id: '', required_sku: '', quantity: '', expected_cost: '' });
-        fetchData();
-      } else {
-        alert(await getResponseError(res, 'Failed to create purchase order.'));
-      }
+      await createPurchaseOrder(poForm);
+      setIsPoModalOpen(false);
+      setPoForm({ supplier_id: '', required_sku: '', quantity: '', expected_cost: '' });
     } catch (err) {
       console.error(err);
       alert('Failed to create purchase order.');
@@ -110,12 +85,7 @@ export default function Procurement() {
   const completePo = async (id: number) => {
     if (!confirm('Receive Goods? This will instantly add stock to Inventory and log the Stock Movement inward.')) return;
     try {
-      const res = await fetch(`/api/procurement/pos/${id}/receive`, { method: 'POST' });
-      if (res.ok) {
-        fetchData();
-      } else {
-        alert(await getResponseError(res, 'Failed to receive goods.'));
-      }
+      await receivePurchaseOrder(id);
     } catch (err) {
       console.error(err);
       alert('Failed to receive goods.');

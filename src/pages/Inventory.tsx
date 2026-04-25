@@ -3,6 +3,14 @@ import { Package, Plus, Search, AlertTriangle, Layers, Edit, Trash2, Download } 
 import clsx from 'clsx';
 import { format, parseISO } from 'date-fns';
 import { actionButtonStyles } from '../utils/ui';
+import {
+  adjustInventoryItem,
+  createInventoryItem,
+  deleteInventoryItem,
+  getInventory,
+  getStockMovements,
+  subscribeToDemoStore
+} from '../demo/store';
 
 type InventoryItem = {
   id: number;
@@ -44,17 +52,18 @@ export default function Inventory() {
   });
 
   useEffect(() => {
-    fetchInventory();
+    void fetchInventory();
+
+    return subscribeToDemoStore(() => {
+      void fetchInventory();
+    });
   }, []);
 
   const fetchInventory = async () => {
     try {
-      const [invRes, movRes] = await Promise.all([
-        fetch('/api/inventory'),
-        fetch('/api/inventory/movements')
-      ]);
-      setItems(Array.isArray(await invRes.clone().json()) ? await invRes.json() : []);
-      setMovements(Array.isArray(await movRes.clone().json()) ? await movRes.json() : []);
+      const [inventoryData, movementData] = await Promise.all([getInventory(), getStockMovements()]);
+      setItems(Array.isArray(inventoryData) ? inventoryData : []);
+      setMovements(Array.isArray(movementData) ? movementData : []);
     } catch (e) {
       console.error("Inventory fetch error:", e);
     } finally {
@@ -65,16 +74,9 @@ export default function Inventory() {
   const handleCreateItem = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch('/api/inventory', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
-      });
-      if (res.ok) {
-        setIsModalOpen(false);
-        setFormData({ sku: '', name: '', category: activeTab === 'finished' ? 'finished' : 'raw', quantity: '', unit: 'kg', reorder_point: '', cost: '' });
-        fetchInventory();
-      }
+      await createInventoryItem(formData);
+      setIsModalOpen(false);
+      setFormData({ sku: '', name: '', category: activeTab === 'finished' ? 'finished' : 'raw', quantity: '', unit: 'kg', reorder_point: '', cost: '' });
     } catch (err) {
       console.error(err);
     }
@@ -82,12 +84,7 @@ export default function Inventory() {
 
   const adjustStock = async (id: number, quantity: number, action: 'add' | 'deduct') => {
     try {
-      const res = await fetch(`/api/inventory/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ quantity, action })
-      });
-      if (res.ok) fetchInventory();
+      await adjustInventoryItem(id, quantity, action);
     } catch (err) {
       console.error(err);
     }
@@ -96,8 +93,7 @@ export default function Inventory() {
   const deleteItem = async (id: number) => {
     if (!confirm('Are you sure you want to delete this inventory item?')) return;
     try {
-      const res = await fetch(`/api/inventory/${id}`, { method: 'DELETE' });
-      if (res.ok) fetchInventory();
+      await deleteInventoryItem(id);
     } catch (err) {
       console.error(err);
     }

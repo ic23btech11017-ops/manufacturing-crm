@@ -3,6 +3,14 @@ import { Plus, Check, X, ArrowRight } from 'lucide-react';
 import { format } from 'date-fns';
 import clsx from 'clsx';
 import { actionButtonStyles, statusToneStyles } from '../utils/ui';
+import {
+  convertQuotationToOrder,
+  createQuotation,
+  getClients,
+  getQuotations,
+  subscribeToDemoStore,
+  updateQuotationStatus
+} from '../demo/store';
 
 type Client = {
   id: number;
@@ -40,17 +48,16 @@ export default function Quotations() {
   });
 
   useEffect(() => {
-    fetchData();
+    void fetchData();
+
+    return subscribeToDemoStore(() => {
+      void fetchData();
+    });
   }, []);
 
   const fetchData = async () => {
     try {
-      const [qRes, cRes] = await Promise.all([
-        fetch('/api/quotations'),
-        fetch('/api/clients')
-      ]);
-      const qs = await qRes.json();
-      const cs = await cRes.json();
+      const [qs, cs] = await Promise.all([getQuotations(), getClients()]);
       setQuotes(Array.isArray(qs) ? qs : []);
       setClients(Array.isArray(cs) ? cs : []);
     } catch (e) {
@@ -65,23 +72,18 @@ export default function Quotations() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch('/api/quotations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          client_id: parseInt(formData.client_id, 10),
-          items: formData.items,
-          total_amount: parseFloat(formData.total_amount) || 0,
-          status: 'pending'
-        })
+      await createQuotation({
+        client_id: parseInt(formData.client_id, 10),
+        items: formData.items.map((item) => ({
+          description: item.description,
+          quantity: parseFloat(String(item.quantity)) || 0,
+          unit_price: parseFloat(String(item.unit_price)) || 0
+        })),
+        total_amount: parseFloat(formData.total_amount) || 0,
+        status: 'pending'
       });
-      if (res.ok) {
-        setIsModalOpen(false);
-        setFormData({ client_id: '', items: [{ description: '', quantity: '', unit_price: '' }], status: 'pending', total_amount: '' });
-        fetchData();
-      } else {
-        throw new Error('Save failed');
-      }
+      setIsModalOpen(false);
+      setFormData({ client_id: '', items: [{ description: '', quantity: '', unit_price: '' }], status: 'pending', total_amount: '' });
     } catch(e: any) {
       alert("Error saving: " + e.message);
     }
@@ -89,12 +91,7 @@ export default function Quotations() {
 
   const updateStatus = async (id: number, status: string) => {
     try {
-      await fetch(`/api/quotations/${id}/status`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status })
-      });
-      fetchData();
+      await updateQuotationStatus(id, status);
     } catch(e) {
       console.error(e);
     }
@@ -102,12 +99,7 @@ export default function Quotations() {
 
   const convertToOrder = async (id: number) => {
     try {
-      await fetch(`/api/orders/convert/${id}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() })
-      });
-      fetchData();
+      await convertQuotationToOrder(id, new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString());
     } catch(e) {
       console.error(e);
       alert('Conversion failed');

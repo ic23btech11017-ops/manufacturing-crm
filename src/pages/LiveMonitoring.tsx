@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Activity, AlertTriangle, Clock, XCircle } from 'lucide-react';
 import clsx from 'clsx';
-import { format } from 'date-fns';
+import { getOrders, subscribeToDemoStore } from '../demo/store';
 
 type Order = {
   id: number;
   client_company: string;
-  product_type: string;
+  product_details: string;
   quantity: number;
   status: string;
-  deadline: string;
+  deadline: string | null;
 };
 
 // Simulated factory machines structure
@@ -36,7 +36,10 @@ export default function LiveMonitoring() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchOrders();
+    void fetchOrders();
+    const unsubscribe = subscribeToDemoStore(() => {
+      void fetchOrders();
+    });
 
     // Simulate live machine updates
     const interval = setInterval(() => {
@@ -52,44 +55,32 @@ export default function LiveMonitoring() {
       }));
     }, 3000);
 
-    return () => clearInterval(interval);
+    return () => {
+      unsubscribe();
+      clearInterval(interval);
+    };
   }, []);
 
   const fetchOrders = async () => {
     try {
-      const res = await fetch('/api/orders');
-      if (res.ok) {
-        const data = await res.json();
-        const arr = Array.isArray(data) ? data : [];
-        setOrders(arr);
-        
-        // Assign production orders to machines randomly for demo purposes
-        const productionOrders = arr.filter(o => o.status === 'production');
-        
-        setMachines(prev => prev.map((m, index) => {
-          if (m.status === 'running' || m.status === 'warning') {
-            return {
-              ...m,
-              current_order_id: productionOrders[index % productionOrders.length]?.id || null
-            }
-          }
-          return m;
-        }));
-      }
+      const arr = await getOrders();
+      setOrders(arr);
+
+      const productionOrders = arr.filter((order) => order.status === 'in_production' || order.status === 'ready');
+
+      setMachines(prev => prev.map((m, index) => {
+        if (m.status === 'running' || m.status === 'warning') {
+          return {
+            ...m,
+            current_order_id: productionOrders[index % productionOrders.length]?.id || null
+          };
+        }
+        return m;
+      }));
     } catch (e) {
       console.error('Failed to load orders for monitoring', e);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const getMachineIcon = (status: string) => {
-    switch (status) {
-      case 'running': return <Activity className="w-5 h-5 text-slate-600 animate-pulse" />;
-      case 'warning': return <AlertTriangle className="w-5 h-5 text-slate-600" />;
-      case 'idle': return <Clock className="w-5 h-5 text-gray-400" />;
-      case 'offline': return <XCircle className="w-5 h-5 text-slate-900" />;
-      default: return null;
     }
   };
 
@@ -198,7 +189,7 @@ export default function LiveMonitoring() {
                     <div className="text-xs font-semibold text-slate-500 mb-1">Active Job</div>
                     {activeOrder ? (
                       <div>
-                        <div className="text-sm font-bold text-slate-900 truncate" title={activeOrder.product_type}>Ord #{activeOrder.id} - {activeOrder.product_type}</div>
+                        <div className="text-sm font-bold text-slate-900 truncate" title={activeOrder.product_details}>Ord #{activeOrder.id} - {activeOrder.product_details}</div>
                         <div className="text-xs text-slate-500 truncate" title={activeOrder.client_company}>{activeOrder.client_company}</div>
                       </div>
                     ) : (

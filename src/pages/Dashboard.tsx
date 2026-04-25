@@ -3,6 +3,7 @@ import { TrendingUp, Package, Clock, Users, FileText, Factory, Activity } from '
 import clsx from 'clsx';
 import { Link } from 'react-router-dom';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
+import { getDashboardMetrics, subscribeToDemoStore } from '../demo/store';
 
 export default function Dashboard() {
   const [metrics, setMetrics] = useState({
@@ -17,12 +18,18 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('/api/dashboard')
-      .then(r => r.json())
-      .then(data => {
-        setMetrics(data);
-        setLoading(false);
-      });
+    const loadMetrics = async () => {
+      setLoading(true);
+      const data = await getDashboardMetrics();
+      setMetrics(data);
+      setLoading(false);
+    };
+
+    void loadMetrics();
+
+    return subscribeToDemoStore(() => {
+      void loadMetrics();
+    });
   }, []);
 
   const stats = [

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BarChart3, TrendingUp, PieChart, Activity, Download } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart as RechartsPieChart, Pie, Cell } from 'recharts';
-import { fetchJsonArray } from '../utils/api';
+import { getReportingData, subscribeToDemoStore } from '../demo/store';
 
 export default function Reporting() {
   const [loading, setLoading] = useState(true);
@@ -10,66 +10,24 @@ export default function Reporting() {
 
   useEffect(() => {
     const loadReportData = async () => {
-      const [ordersResult, inventoryResult, qualityResult] = await Promise.allSettled([
-        fetchJsonArray<any>('/api/orders'),
-        fetchJsonArray<any>('/api/inventory'),
-        fetchJsonArray<any>('/api/quality')
-      ]);
-
-      const errors: string[] = [];
-      const orders = ordersResult.status === 'fulfilled' ? ordersResult.value : [];
-      const inventory = inventoryResult.status === 'fulfilled' ? inventoryResult.value : [];
-      const quality = qualityResult.status === 'fulfilled' ? qualityResult.value : [];
-
-      if (ordersResult.status === 'rejected') {
-        console.error('Reporting orders fetch failed:', ordersResult.reason);
-        errors.push('orders');
+      try {
+        setLoading(true);
+        const reportData = await getReportingData();
+        setData(reportData);
+        setError(null);
+      } catch (err) {
+        console.error('Reporting demo data load failed:', err);
+        setError('Reporting demo data could not be loaded.');
+      } finally {
+        setLoading(false);
       }
-
-      if (inventoryResult.status === 'rejected') {
-        console.error('Reporting inventory fetch failed:', inventoryResult.reason);
-        errors.push('inventory');
-      }
-
-      if (qualityResult.status === 'rejected') {
-        console.error('Reporting quality fetch failed:', qualityResult.reason);
-        errors.push('quality');
-      }
-
-      const ordersByMonth = orders.reduce((acc: any, order: any) => {
-        const sourceDate = order.created_at || order.deadline;
-        const parsedDate = sourceDate ? new Date(sourceDate) : null;
-
-        if (!parsedDate || Number.isNaN(parsedDate.getTime())) {
-          return acc;
-        }
-
-        const month = parsedDate.toLocaleString('default', { month: 'short' });
-        if (!acc[month]) acc[month] = { name: month, orders: 0 };
-        acc[month].orders += 1;
-        return acc;
-      }, {});
-
-      const inventoryValuation = inventory.reduce((sum: number, item: any) => sum + (item.quantity * item.cost), 0);
-      const inventoryByCategory = [
-        { name: 'Raw Materials', value: inventory.filter((i:any) => i.category === 'raw').reduce((sum:number, i:any) => sum + (i.quantity * i.cost), 0) },
-        { name: 'Finished Goods', value: inventory.filter((i:any) => i.category === 'finished').reduce((sum:number, i:any) => sum + (i.quantity * i.cost), 0) }
-      ];
-
-      const passRate = quality.filter((q:any) => q.status === 'passed').length / Math.max(quality.filter((q:any) => q.status !== 'pending').length, 1) * 100;
-
-      setData({
-        orderTrends: Object.values(ordersByMonth),
-        inventoryValuation,
-        inventoryByCategory,
-        qualityPassRate: passRate,
-        totalOrders: orders.length
-      });
-      setError(errors.length > 0 ? `Some report data could not be loaded (${errors.join(', ')}).` : null);
-      setLoading(false);
     };
 
-    loadReportData();
+    void loadReportData();
+
+    return subscribeToDemoStore(() => {
+      void loadReportData();
+    });
   }, []);
 
   if (loading) {

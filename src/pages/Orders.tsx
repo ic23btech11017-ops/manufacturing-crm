@@ -1,9 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { format, isPast, parseISO } from 'date-fns';
 import clsx from 'clsx';
-import { AlertCircle, KanbanSquare, Activity } from 'lucide-react';
+import { KanbanSquare, Activity } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import LiveMonitoring from './LiveMonitoring';
+import {
+  createManualOrder,
+  getClients,
+  getOrders,
+  subscribeToDemoStore,
+  updateOrderStatus
+} from '../demo/store';
 
 type Order = {
   id: number;
@@ -40,14 +47,18 @@ export default function Orders() {
   });
 
   useEffect(() => {
-    fetchOrders();
-    fetchClients();
+    void fetchOrders();
+    void fetchClients();
+
+    return subscribeToDemoStore(() => {
+      void fetchOrders();
+      void fetchClients();
+    });
   }, []);
 
   const fetchOrders = async () => {
     try {
-      const res = await fetch('/api/orders');
-      const data = await res.json();
+      const data = await getOrders();
       setOrders(Array.isArray(data) ? data : []);
     } catch (e) {
       console.error("Orders fetch error:", e);
@@ -59,8 +70,7 @@ export default function Orders() {
 
   const fetchClients = async () => {
     try {
-      const res = await fetch('/api/clients');
-      const data = await res.json();
+      const data = await getClients();
       setClients(Array.isArray(data) ? data : []);
     } catch (e) {
       console.error("Clients fetch error:", e);
@@ -69,12 +79,7 @@ export default function Orders() {
 
   const updateStatus = async (id: number, status: string) => {
     try {
-      await fetch(`/api/orders/${id}/status`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status })
-      });
-      fetchOrders();
+      await updateOrderStatus(id, status);
     } catch (e) {
       console.error("Order status update:", e);
     }
@@ -83,16 +88,9 @@ export default function Orders() {
   const handleCreateOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch('/api/orders/manual', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
-      });
-      if (res.ok) {
-        setIsModalOpen(false);
-        setFormData({ client_id: '', product_details: '', quantity: '', deadline: '' });
-        fetchOrders();
-      }
+      await createManualOrder(formData);
+      setIsModalOpen(false);
+      setFormData({ client_id: '', product_details: '', quantity: '', deadline: '' });
     } catch (err) {
       console.error(err);
     }

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus } from 'lucide-react';
 import { format } from 'date-fns';
+import { createClient, getClients, subscribeToDemoStore } from '../demo/store';
 
 type Client = {
   id: number;
@@ -30,15 +31,18 @@ export default function CRM() {
   });
 
   useEffect(() => {
-    fetchClients();
+    void fetchClients();
+
+    return subscribeToDemoStore(() => {
+      void fetchClients();
+    });
   }, []);
 
   const fetchClients = async () => {
     try {
-      const res = await fetch('/api/clients');
-      if (!res.ok) throw new Error('API returned ' + res.status);
-      const data = await res.json();
+      const data = await getClients();
       setClients(Array.isArray(data) ? data : []);
+      setErrorMsg('');
     } catch (e: any) {
       console.error(e);
       setErrorMsg(e.message);
@@ -51,18 +55,9 @@ export default function CRM() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch('/api/clients', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
-      });
-      if (res.ok) {
-        setIsModalOpen(false);
-        setFormData({ name: '', company: '', phone: '', email: '', industry: '', notes: '' });
-        fetchClients();
-      } else {
-        throw new Error('Save failed');
-      }
+      await createClient(formData);
+      setIsModalOpen(false);
+      setFormData({ name: '', company: '', phone: '', email: '', industry: '', notes: '' });
     } catch (e: any) {
       alert("Error saving: " + e.message);
     }

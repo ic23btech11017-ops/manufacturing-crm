@@ -3,6 +3,7 @@ import { ShieldCheck, Crosshair, AlertTriangle, Check, X } from 'lucide-react';
 import clsx from 'clsx';
 import { format, parseISO } from 'date-fns';
 import { actionButtonStyles, statusToneStyles } from '../utils/ui';
+import { getQualityChecks, inspectQualityCheck, subscribeToDemoStore } from '../demo/store';
 
 type QualityCheck = {
   id: number;
@@ -25,13 +26,17 @@ export default function QualityControl() {
   const [formData, setFormData] = useState({ status: 'passed', defect_rate: '0', notes: '' });
 
   useEffect(() => {
-    fetchChecks();
+    void fetchChecks();
+
+    return subscribeToDemoStore(() => {
+      void fetchChecks();
+    });
   }, []);
 
   const fetchChecks = async () => {
     try {
-      const res = await fetch('/api/quality');
-      setChecks(Array.isArray(await res.clone().json()) ? await res.json() : []);
+      const checks = await getQualityChecks();
+      setChecks(Array.isArray(checks) ? checks : []);
     } catch (err) {
       console.error(err);
     } finally {
@@ -60,15 +65,12 @@ export default function QualityControl() {
     e.preventDefault();
     if (!selectedCheck) return;
     try {
-      const res = await fetch(`/api/quality/${selectedCheck.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+      await inspectQualityCheck(selectedCheck.id, {
+        status: formData.status as QualityCheck['status'],
+        defect_rate: formData.defect_rate,
+        notes: formData.notes
       });
-      if (res.ok) {
-        setIsModalOpen(false);
-        fetchChecks();
-      }
+      setIsModalOpen(false);
     } catch (err) {
       console.error(err);
     }
