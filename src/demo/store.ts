@@ -151,6 +151,15 @@ export type StockTransfer = {
   requested_at: string;
 };
 
+export type ActivityLogEntry = {
+  id: number;
+  actor: string;
+  role: string;
+  action: string;
+  entity: string;
+  timestamp: string;
+};
+
 type DemoStore = {
   clients: Client[];
   quotations: QuotationRecord[];
@@ -164,11 +173,33 @@ type DemoStore = {
   qualityChecks: QualityCheck[];
   warehouses: Warehouse[];
   stockTransfers: StockTransfer[];
+  activityLog: ActivityLogEntry[];
 };
 
 type PersistedDemoStore = DemoStore & {
   version: number;
 };
+
+// Current actor injected by AuthContext after login/logout
+let _currentActor = { name: 'System', role: 'system' };
+export function setStoreActor(actor: string, role: string) {
+  _currentActor = { name: actor, role };
+}
+
+function appendActivity(store: PersistedDemoStore, action: string, entity: string) {
+  const entry: ActivityLogEntry = {
+    id: store.activityLog.length > 0 ? Math.max(...store.activityLog.map(e => e.id)) + 1 : 1,
+    actor: _currentActor.name,
+    role: _currentActor.role,
+    action,
+    entity,
+    timestamp: new Date().toISOString(),
+  };
+  store.activityLog.push(entry);
+  if (store.activityLog.length > 200) {
+    store.activityLog.splice(0, store.activityLog.length - 200);
+  }
+}
 
 type DashboardMetrics = {
   totalOrders: number;
@@ -490,7 +521,8 @@ function createInitialStore(): PersistedDemoStore {
     stockMovements,
     qualityChecks,
     warehouses,
-    stockTransfers: createInitialTransfers(warehouses)
+    stockTransfers: createInitialTransfers(warehouses),
+    activityLog: []
   };
 }
 
@@ -509,6 +541,7 @@ function readStore(): PersistedDemoStore {
   try {
     const parsed = JSON.parse(stored) as PersistedDemoStore;
     if (parsed?.version === STORAGE_VERSION) {
+      if (!parsed.activityLog) parsed.activityLog = [];
       return parsed;
     }
   } catch {
@@ -624,6 +657,10 @@ export async function getClients() {
   return sortByTimestampDesc(selectStore((store) => store.clients), (client) => client.created_at);
 }
 
+export async function getActivityLog() {
+  return selectStore((store) => [...store.activityLog].reverse());
+}
+
 export async function createClient(input: Omit<Client, 'id' | 'created_at'>) {
   return updateStore((store) => {
     const client: Client = {
@@ -638,6 +675,7 @@ export async function createClient(input: Omit<Client, 'id' | 'created_at'>) {
     };
 
     store.clients.push(client);
+    appendActivity(store, 'Created client', client.company);
     return client;
   });
 }
@@ -672,6 +710,7 @@ export async function createQuotation(input: {
     };
 
     store.quotations.push(quotation);
+    appendActivity(store, 'Created quotation', `QT-${quotation.id}`);
     return hydrateQuotation(quotation, store.clients);
   });
 }
@@ -684,6 +723,7 @@ export async function updateQuotationStatus(id: number, status: string) {
     }
 
     quotation.status = status;
+    appendActivity(store, `Quotation status → ${status}`, `QT-${id}`);
     return hydrateQuotation(quotation, store.clients);
   });
 }
@@ -710,7 +750,7 @@ export async function convertQuotationToOrder(quotationId: number, deadline: str
 
     quotation.status = 'approved';
     store.orders.push(order);
-
+    appendActivity(store, 'Converted quotation to order', `ORD-${order.id}`);
     return hydrateOrder(order, store.clients);
   });
 }
@@ -743,6 +783,7 @@ export async function createManualOrder(input: {
     };
 
     store.orders.push(order);
+    appendActivity(store, 'Created manual order', `ORD-${order.id}`);
     return hydrateOrder(order, store.clients);
   });
 }
@@ -755,6 +796,7 @@ export async function updateOrderStatus(id: number, status: string) {
     }
 
     order.status = status;
+    appendActivity(store, `Order status → ${status}`, `ORD-${id}`);
     return hydrateOrder(order, store.clients);
   });
 }
@@ -818,9 +860,10 @@ export async function adjustInventoryItem(id: number, quantity: NumericInput, ac
       reference_id: null,
       notes: 'Manual Adjustment',
       created_at: new Date().toISOString(),
-      user: 'Operator'
+      user: _currentActor.name
     });
 
+    appendActivity(store, `Stock adjusted (${action})`, item.sku);
     return item;
   });
 }
@@ -878,6 +921,7 @@ export async function createWorkOrder(input: { bom_id: NumericInput; target_quan
     };
 
     store.workOrders.push(workOrder);
+    appendActivity(store, 'Created work order', `WO-${workOrder.id}`);
     return workOrder;
   });
 }
@@ -910,6 +954,7 @@ export async function updateWorkOrderStatus(id: number, status: WorkOrder['statu
     }
 
     workOrder.status = status;
+    if (status === 'in_progress') appendActivity(store, 'Started production', `WO-${id}`);
     return workOrder;
   });
 }
@@ -951,7 +996,7 @@ export async function completeWorkOrder(id: number, actualYield?: NumericInput) 
         reference_id: workOrder.id,
         notes: `Consumed for WO-${workOrder.id}`,
         created_at: timestamp,
-        user: 'System'
+        user: _currentActor.name
       });
     }
 
@@ -967,13 +1012,14 @@ export async function completeWorkOrder(id: number, actualYield?: NumericInput) 
       reference_id: workOrder.id,
       notes: wastage > 0 ? `Manufactured from WO-${workOrder.id} (Loss: ${wastage} units)` : `Manufactured from WO-${workOrder.id}`,
       created_at: timestamp,
-      user: 'System'
+      user: _currentActor.name
     });
 
     workOrder.status = 'completed';
     workOrder.completed_at = timestamp;
     workOrder.actual_yield = yieldQuantity;
     workOrder.wastage = wastage;
+    appendActivity(store, `Completed batch (yield: ${yieldQuantity})`, `WO-${id}`);
 
     store.qualityChecks.push({
       id: getNextId(store.qualityChecks),
@@ -1010,7 +1056,7 @@ export async function inspectQualityCheck(
     qualityCheck.defect_rate = normalizeNumber(input.defect_rate, 0);
     qualityCheck.notes = normalizeText(input.notes, '');
     qualityCheck.inspected_at = new Date().toISOString();
-
+    appendActivity(store, `QC inspection: ${input.status}`, `QC-${id}`);
     return qualityCheck;
   });
 }
@@ -1030,6 +1076,7 @@ export async function createSupplier(input: Omit<Supplier, 'id' | 'created_at'>)
     };
 
     store.suppliers.push(supplier);
+    appendActivity(store, 'Added supplier', supplier.name);
     return supplier;
   });
 }
@@ -1084,9 +1131,10 @@ export async function receivePurchaseOrder(id: number) {
       reference_id: purchaseOrder.id,
       notes: `Received from PO-${purchaseOrder.id}`,
       created_at: timestamp,
-      user: 'Manager'
+      user: _currentActor.name
     });
 
+    appendActivity(store, 'Received purchase order', `PO-${id}`);
     purchaseOrder.status = 'received';
     purchaseOrder.received_at = timestamp;
 

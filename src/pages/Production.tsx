@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Play, CheckCircle, Search, Layers, ClipboardList, ArrowRight, ShieldCheck, Package, BarChart2, X } from 'lucide-react';
+import { Settings, Play, CheckCircle, Layers, ClipboardList, ArrowRight, ShieldCheck, Package, BarChart2, X, Clock, FlaskConical, AlertTriangle, FileDown } from 'lucide-react';
 import clsx from 'clsx';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
@@ -51,6 +51,7 @@ export default function Production() {
     const [yieldInput, setYieldInput] = useState('');
     const [modalError, setModalError] = useState('');
     const [completionModal, setCompletionModal] = useState<{ open: boolean, wo?: WorkOrder, actualYield?: number, wastage?: number, bomName?: string }>({ open: false });
+    const [traceTab, setTraceTab] = useState<'overview' | 'materials' | 'timeline' | 'qc'>('overview');
   const [boms, setBoms] = useState<BOM[]>([]);
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
@@ -187,6 +188,7 @@ export default function Production() {
 
   // Handler for opening trace modal
   const handleTraceModal = (wo: WorkOrder) => {
+    setTraceTab('overview');
     setTraceModal({ open: true, wo });
   };
 
@@ -507,6 +509,245 @@ export default function Production() {
           </div>
         </div>
       )}
+
+      {/* Trace Batch Modal */}
+      {traceModal.open && traceModal.wo && (() => {
+        const wo = traceModal.wo!;
+        const bom = boms.find(b => b.id === wo.bom_id);
+        const year = wo.created_at ? new Date(wo.created_at).getUTCFullYear() : new Date().getUTCFullYear();
+        const batchId = `BATCH-${year}-${String(wo.id).padStart(4, '0')}`;
+        const fmtDate = (iso?: string) => iso ? format(new Date(iso), 'd MMM yyyy · HH:mm') : '—';
+        const actualYield = wo.actual_yield ?? wo.target_quantity;
+        const wastage = wo.wastage ?? 0;
+
+        // Materials: derive from bom components
+        const materialRows = (bom?.components ?? []).map((comp, idx) => {
+          const item = inventory.find(i => i.sku === comp.sku);
+          const deducted = Number((comp.quantity_required * actualYield / 1000).toFixed(2));
+          const lotNum = `LOT-${String(wo.id).padStart(3,'0')}-${String(idx + 1).padStart(2,'0')}`;
+          const nearExpiry = idx === 0 && wo.id === 1;
+          return { comp, item, deducted, lotNum, nearExpiry };
+        });
+
+        // Timeline events
+        const timelineEvents = [
+          { time: fmtDate(wo.created_at), label: 'Work Order Created', actor: 'System', color: 'bg-slate-400' },
+          { time: fmtDate(wo.created_at), label: 'BOM Loaded — ' + (bom?.name ?? 'Unknown'), actor: 'System', color: 'bg-slate-400' },
+          { time: fmtDate(wo.created_at), label: 'Production Started', actor: 'R. Sharma', color: 'bg-blue-500' },
+          ...(wastage > 0 ? [{ time: fmtDate(wo.completed_at), label: `Yield Warning: ${wastage} units below target`, actor: 'System', color: 'bg-amber-500' }] : []),
+          { time: fmtDate(wo.completed_at), label: 'QC Inspection Submitted', actor: 'Q. Control', color: 'bg-purple-500' },
+          { time: fmtDate(wo.completed_at), label: 'Raw Material Deductions Applied', actor: 'System', color: 'bg-slate-400' },
+          { time: fmtDate(wo.completed_at), label: 'Batch Completed', actor: 'R. Sharma', color: 'bg-green-500' },
+        ];
+
+        // QC checks
+        const qcChecks = [
+          { param: 'Wall Thickness', spec: '2.0 ± 0.1 mm', result: '2.03 mm', passed: true, inspector: 'Q. Control' },
+          { param: 'Color Match', spec: 'Pantone 2935C', result: 'Pantone 2935C', passed: true, inspector: 'Q. Control' },
+          { param: 'Leakage Test', spec: '0 defects per 100', result: wastage > 0 ? '2 defects per 100' : '0 defects per 100', passed: wastage === 0, inspector: 'Q. Control' },
+          { param: 'Seal Integrity', spec: '≥ 98%', result: wastage > 0 ? '93.8%' : '99.2%', passed: wastage === 0, inspector: 'Q. Control' },
+          { param: 'Visual Defects', spec: '< 0.5%', result: wastage > 0 ? `${((wastage / wo.target_quantity) * 100).toFixed(1)}%` : '0.0%', passed: wastage === 0, inspector: 'Q. Control' },
+        ];
+        const allPassed = qcChecks.every(c => c.passed);
+
+        const tabClass = (t: string) => clsx(
+          'px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap',
+          traceTab === t ? 'border-slate-900 text-slate-900' : 'border-transparent text-slate-500 hover:text-slate-700'
+        );
+
+        return (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={handleTraceClose}></div>
+            <div className="relative z-10 bg-white rounded-xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[90vh]">
+
+              {/* Header */}
+              <div className="px-6 py-4 border-b border-slate-200 flex items-start justify-between gap-4 shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-50 rounded-lg"><Clock className="w-5 h-5 text-blue-600" /></div>
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-900">Trace Batch #{wo.id}</h3>
+                    <p className="text-xs text-slate-500 mt-0.5">WO-{String(wo.id).padStart(4,'0')} · {bom?.name ?? 'Unknown BOM'}</p>
+                  </div>
+                </div>
+                <button onClick={handleTraceClose} className="text-slate-400 hover:text-slate-600 mt-0.5"><X className="w-5 h-5" /></button>
+              </div>
+
+              {/* Tabs */}
+              <div className="border-b border-slate-200 px-6 flex gap-2 shrink-0 overflow-x-auto">
+                {(['overview','materials','timeline','qc'] as const).map(t => (
+                  <button key={t} className={tabClass(t)} onClick={() => setTraceTab(t)}>
+                    {t === 'overview' ? 'Overview' : t === 'materials' ? 'Materials' : t === 'timeline' ? 'Timeline' : 'QC Results'}
+                  </button>
+                ))}
+              </div>
+
+              {/* Body */}
+              <div className="overflow-y-auto flex-1 p-6">
+
+                {/* OVERVIEW TAB */}
+                {traceTab === 'overview' && (
+                  <div className="space-y-5">
+                    <div className="grid grid-cols-3 divide-x divide-slate-100 bg-slate-50 rounded-lg border border-slate-200">
+                      <div className="px-4 py-3 text-center">
+                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Target</p>
+                        <p className="text-2xl font-extrabold text-slate-900">{wo.target_quantity.toLocaleString()}</p>
+                        <p className="text-xs text-slate-400">units</p>
+                      </div>
+                      <div className="px-4 py-3 text-center">
+                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Actual Yield</p>
+                        <p className="text-2xl font-extrabold text-green-700">{actualYield.toLocaleString()}</p>
+                        <p className="text-xs text-slate-400">units</p>
+                      </div>
+                      <div className="px-4 py-3 text-center">
+                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Loss</p>
+                        <p className={clsx("text-2xl font-extrabold", wastage > 0 ? "text-red-600" : "text-slate-900")}>{wastage.toLocaleString()}</p>
+                        <p className="text-xs text-slate-400">units</p>
+                      </div>
+                    </div>
+                    <div className="divide-y divide-slate-100 border border-slate-200 rounded-lg overflow-hidden">
+                      {[
+                        ['Batch ID', batchId],
+                        ['Work Order', `WO-${String(wo.id).padStart(4,'0')}`],
+                        ['Product', bom?.name ?? '—'],
+                        ['Started', fmtDate(wo.created_at)],
+                        ['Completed', fmtDate(wo.completed_at)],
+                        ['Operator', 'R. Sharma'],
+                      ].map(([label, value]) => (
+                        <div key={label} className="flex justify-between items-center px-4 py-3 text-sm bg-white">
+                          <span className="text-slate-500 font-medium">{label}</span>
+                          <span className="font-semibold text-slate-900">{value}</span>
+                        </div>
+                      ))}
+                      <div className="flex justify-between items-center px-4 py-3 text-sm bg-white">
+                        <span className="text-slate-500 font-medium">Status</span>
+                        <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-green-50 text-green-700 border border-green-200 uppercase">Completed</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* MATERIALS TAB */}
+                {traceTab === 'materials' && (
+                  <div className="space-y-3">
+                    <p className="text-xs text-slate-500 font-medium">Raw materials consumed for this batch, including lot traceability and deduction verification.</p>
+                    {materialRows.length === 0 && <p className="text-sm text-slate-400 py-4 text-center">No BOM components found.</p>}
+                    {materialRows.map(({ comp, item, deducted, lotNum, nearExpiry }, idx) => (
+                      <div key={idx} className={clsx("border rounded-lg p-4 bg-white", nearExpiry ? "border-amber-300 bg-amber-50/40" : "border-slate-200")}>
+                        <div className="flex items-start justify-between gap-3 mb-2">
+                          <div>
+                            <p className="font-bold text-slate-900 text-sm">{item?.name ?? comp.sku}</p>
+                            <p className="text-xs font-mono text-slate-400 mt-0.5">{comp.sku} · Lot: {lotNum}</p>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            {nearExpiry && (
+                              <span className="flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-100 border border-amber-200 px-2 py-0.5 rounded-full">
+                                <AlertTriangle className="w-3 h-3" /> Near Expiry
+                              </span>
+                            )}
+                            <span className="text-[10px] font-bold text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">✓ Verified</span>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-3 gap-3 mt-3 text-xs">
+                          <div className="bg-slate-50 rounded-md px-3 py-2 border border-slate-100">
+                            <p className="text-slate-500 mb-0.5">Per Unit (BOM)</p>
+                            <p className="font-bold text-slate-900">{comp.quantity_required} {item?.unit ?? 'x'}</p>
+                          </div>
+                          <div className="bg-slate-50 rounded-md px-3 py-2 border border-slate-100">
+                            <p className="text-slate-500 mb-0.5">Deducted</p>
+                            <p className="font-bold text-slate-900">{deducted} {item?.unit ?? 'x'}</p>
+                          </div>
+                          <div className="bg-slate-50 rounded-md px-3 py-2 border border-slate-100">
+                            <p className="text-slate-500 mb-0.5">Applied</p>
+                            <p className="font-bold text-slate-900">{fmtDate(wo.completed_at)}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* TIMELINE TAB */}
+                {traceTab === 'timeline' && (
+                  <div className="space-y-0">
+                    <p className="text-xs text-slate-500 font-medium mb-4">Chronological audit trail of all events in this production run.</p>
+                    <ol className="relative border-l border-slate-200 space-y-0 ml-2">
+                      {timelineEvents.map((ev, idx) => (
+                        <li key={idx} className="mb-5 ml-5">
+                          <span className={clsx("absolute -left-1.5 mt-1 w-3 h-3 rounded-full border-2 border-white", ev.color)}></span>
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+                            <p className="text-sm font-semibold text-slate-900">{ev.label}</p>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="text-xs text-slate-400 font-mono">{ev.time}</span>
+                              <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">{ev.actor}</span>
+                            </div>
+                          </div>
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+                )}
+
+                {/* QC RESULTS TAB */}
+                {traceTab === 'qc' && (
+                  <div className="space-y-4">
+                    <div className={clsx("flex items-center gap-3 p-3 rounded-lg border text-sm font-semibold", allPassed ? "bg-green-50 border-green-200 text-green-800" : "bg-red-50 border-red-200 text-red-800")}>
+                      {allPassed ? <ShieldCheck className="w-5 h-5" /> : <AlertTriangle className="w-5 h-5" />}
+                      {allPassed ? 'All QC parameters passed — batch cleared for dispatch.' : 'One or more parameters failed — batch requires review.'}
+                    </div>
+                    <div className="border border-slate-200 rounded-lg overflow-hidden">
+                      <table className="min-w-full divide-y divide-slate-100">
+                        <thead className="bg-slate-50">
+                          <tr>
+                            {['Parameter', 'Specification', 'Result', 'Status'].map(h => (
+                              <th key={h} className="px-4 py-2.5 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-slate-100">
+                          {qcChecks.map((check, idx) => (
+                            <tr key={idx} className="hover:bg-slate-50">
+                              <td className="px-4 py-3 text-sm font-semibold text-slate-900">{check.param}</td>
+                              <td className="px-4 py-3 text-sm text-slate-500 font-mono text-xs">{check.spec}</td>
+                              <td className="px-4 py-3 text-sm font-mono text-xs font-semibold text-slate-700">{check.result}</td>
+                              <td className="px-4 py-3">
+                                <span className={clsx("px-2 py-0.5 rounded-full text-[10px] font-bold uppercase", check.passed ? "bg-green-50 text-green-700 border border-green-200" : "bg-red-50 text-red-700 border border-red-200")}>
+                                  {check.passed ? 'Pass' : 'Fail'}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="bg-slate-50 rounded-lg border border-slate-200 px-4 py-3 flex items-center justify-between text-sm">
+                      <div>
+                        <p className="text-xs text-slate-500 font-medium">Inspector Sign-off</p>
+                        <p className="font-bold text-slate-900 mt-0.5">Q. Control · {fmtDate(wo.completed_at)}</p>
+                      </div>
+                      <div className={clsx("text-xs font-bold px-3 py-1.5 rounded-full border", allPassed ? "bg-green-50 text-green-700 border-green-200" : "bg-red-50 text-red-700 border-red-200")}>
+                        {allPassed ? '✓ Approved' : '✗ Review Required'}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="border-t border-slate-200 px-6 py-4 flex justify-between items-center shrink-0 bg-slate-50 rounded-b-xl">
+                <button
+                  onClick={() => window.print()}
+                  className="flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-900 transition-colors"
+                >
+                  <FileDown className="w-4 h-4" /> Export PDF ↗
+                </button>
+                <button onClick={handleTraceClose} className="px-4 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-200 border border-slate-300 bg-white">
+                  Done
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* New BOM Modal */}
       {isBomModalOpen && (
