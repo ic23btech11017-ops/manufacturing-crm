@@ -1150,6 +1150,71 @@ export async function getStockTransfers() {
   return sortByTimestampDesc(selectStore((store) => store.stockTransfers), (transfer) => transfer.requested_at);
 }
 
+export async function createStockTransfer(input: {
+  from_warehouse_id: number;
+  to_warehouse_id: number;
+  item_sku: string;
+  quantity: NumericInput;
+}) {
+  return updateStore((store) => {
+    const qty = normalizeNumber(input.quantity, 0);
+    const transfer: StockTransfer = {
+      id: getNextId(store.stockTransfers),
+      from_warehouse_id: input.from_warehouse_id,
+      to_warehouse_id: input.to_warehouse_id,
+      item_sku: normalizeText(input.item_sku, ''),
+      quantity: qty,
+      status: 'pending',
+      requested_at: new Date().toISOString(),
+    };
+    store.stockTransfers.push(transfer);
+
+    const item = store.inventory.find(i => i.sku === input.item_sku);
+    if (item) {
+      item.quantity -= qty;
+      item.last_updated = transfer.requested_at;
+      store.stockMovements.push({
+        id: getNextId(store.stockMovements),
+        item_sku: input.item_sku,
+        movement_type: 'transfer_out',
+        quantity_change: qty,
+        reference_id: transfer.id,
+        notes: `Transfer to warehouse #${input.to_warehouse_id}`,
+        created_at: transfer.requested_at,
+        user: _currentActor.name,
+      });
+    }
+
+    const fromWh = store.warehouses.find(w => w.id === input.from_warehouse_id);
+    const toWh   = store.warehouses.find(w => w.id === input.to_warehouse_id);
+    appendActivity(store, 'Stock transfer raised', `${input.item_sku} → ${toWh?.name ?? 'WH#' + input.to_warehouse_id}`);
+    return transfer;
+  });
+}
+
+export async function writeOffInventory(id: number, quantity: NumericInput, reason: string, notes: string) {
+  return updateStore((store) => {
+    const item = store.inventory.find(e => e.id === id);
+    if (!item) throw new Error('Inventory item not found.');
+    const qty = Math.min(normalizeNumber(quantity, 0), item.quantity);
+    const timestamp = new Date().toISOString();
+    item.quantity -= qty;
+    item.last_updated = timestamp;
+    store.stockMovements.push({
+      id: getNextId(store.stockMovements),
+      item_sku: item.sku,
+      movement_type: 'write_off',
+      quantity_change: qty,
+      reference_id: null,
+      notes: `Write-off (${reason})${notes ? ': ' + notes : ''}`,
+      created_at: timestamp,
+      user: _currentActor.name,
+    });
+    appendActivity(store, `Write-off (${reason})`, item.sku);
+    return item;
+  });
+}
+
 export async function getDashboardMetrics(): Promise<DashboardMetrics> {
   return selectStore((store) => {
     const orders = store.orders.map((order) => hydrateOrder(order, store.clients));
