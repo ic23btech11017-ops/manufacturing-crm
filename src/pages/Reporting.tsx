@@ -72,7 +72,7 @@ export default function Reporting() {
         </div>
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-center">
           <p className="text-xs text-slate-500 font-bold uppercase mb-2 flex items-center gap-2"><PieChart className="w-4 h-4 text-slate-600"/> Inventory Value</p>
-          <p className="text-3xl font-extrabold text-slate-900">${data?.inventoryValuation?.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}</p>
+          <p className="text-3xl font-extrabold text-slate-900">₹{data?.inventoryValuation?.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}</p>
         </div>
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-center">
           <p className="text-xs text-slate-500 font-bold uppercase mb-2 flex items-center gap-2"><Activity className="w-4 h-4 text-slate-600"/> Quality Pass Rate</p>
@@ -122,7 +122,7 @@ export default function Reporting() {
                     <Cell key={`cell-${index}`} fill={pieColors[index]} />
                   ))}
                 </Pie>
-                <RechartsTooltip formatter={(value: number) => `$${value.toLocaleString()}`} contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} />
+                <RechartsTooltip formatter={(value: number) => `₹${value.toLocaleString()}`} contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} />
               </RechartsPieChart>
             </ResponsiveContainer>
           </div>
@@ -133,7 +133,7 @@ export default function Reporting() {
                    <div className="w-3 h-3 rounded-sm" style={{backgroundColor: pieColors[idx]}}></div>
                    {category.name}
                  </div>
-                 <div className="font-bold text-slate-900">${category.value.toLocaleString(undefined, {maximumFractionDigits: 0})}</div>
+                 <div className="font-bold text-slate-900">₹{category.value.toLocaleString(undefined, {maximumFractionDigits: 0})}</div>
                </div>
             ))}
           </div>

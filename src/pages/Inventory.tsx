@@ -154,7 +154,7 @@ export default function Inventory() {
           <div>
             <p className="text-sm font-semibold text-slate-500">Total Valuation</p>
             <p className="text-2xl font-bold text-slate-900">
-              ${items.reduce((acc, item) => acc + (item.quantity * item.cost), 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+              ₹{items.reduce((acc, item) => acc + (item.quantity * item.cost), 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
             </p>
           </div>
         </div>
@@ -268,8 +268,8 @@ export default function Inventory() {
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-slate-900">${(item.quantity * item.cost).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
-                        <div className="text-xs text-slate-500 mt-0.5">${item.cost.toFixed(2)} / {item.unit}</div>
+                        <div className="text-sm font-medium text-slate-900">₹{(item.quantity * item.cost).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                        <div className="text-xs text-slate-500 mt-0.5">₹{item.cost.toFixed(2)} / {item.unit}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
                         <div className="flex justify-end items-center gap-2">

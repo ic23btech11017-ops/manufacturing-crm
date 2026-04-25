@@ -161,7 +161,7 @@ export default function Procurement() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">{supplier?.name || 'Unknown'}</td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-bold text-slate-900">{po.quantity}x {po.required_sku}</div>
-                        <div className="text-xs text-slate-500">Est Cost: ${po.expected_cost}</div>
+                        <div className="text-xs text-slate-500">Est Cost: ₹{po.expected_cost}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={clsx(

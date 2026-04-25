@@ -17,11 +17,11 @@ export default function Dashboard() {
 
   const [loading, setLoading] = useState(true);
 
-  const formatChartValue = (value: number) =>
-    value.toLocaleString(undefined, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    });
+  const formatChartAxis = (value: number) =>
+    value >= 1000 ? `₹${(value / 1000).toFixed(0)}K` : `₹${value}`;
+
+  const formatChartTooltip = (value: number) =>
+    `₹${value.toLocaleString('en-IN')}`;
 
   useEffect(() => {
     const loadMetrics = async () => {
@@ -41,7 +41,7 @@ export default function Dashboard() {
   const stats = [
     { name: 'Total Orders', value: metrics.totalOrders, icon: Package, link: '/orders' },
     { name: 'In Production', value: metrics.inProduction, icon: TrendingUp, link: '/production' },
-    { name: 'Pipeline Revenue', value: `$${metrics.basicRevenue.toLocaleString()}`, icon: FileText, link: '/quotations' },
+    { name: 'Pipeline Revenue', value: `₹${metrics.basicRevenue.toLocaleString()}`, icon: FileText, link: '/quotations' },
     { name: 'Total Clients', value: metrics.totalClients, icon: Users, link: '/clients' },
   ];
 
@@ -94,12 +94,13 @@ export default function Dashboard() {
                   axisLine={false}
                   tickLine={false}
                   tick={{fill: '#666666', fontSize: 12}}
-                  tickFormatter={(value: number) => formatChartValue(Number(value))}
+                  tickFormatter={formatChartAxis}
+                  width={55}
                 />
                 <RechartsTooltip
                   formatter={(value: number, name: string) => [
-                    formatChartValue(Number(value)),
-                    name === 'sales' ? 'Sales' : 'Production'
+                    formatChartTooltip(Number(value)),
+                    name === 'sales' ? 'Sales (₹)' : 'Production (units)'
                   ]}
                   contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}}
                 />

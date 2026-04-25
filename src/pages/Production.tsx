@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Play, CheckCircle, Search, Layers, ClipboardList } from 'lucide-react';
+import { Settings, Play, CheckCircle, Search, Layers, ClipboardList, ArrowRight, ShieldCheck, Package, BarChart2, X } from 'lucide-react';
 import clsx from 'clsx';
 import { format } from 'date-fns';
+import { useNavigate } from 'react-router-dom';
 import { actionButtonStyles, statusToneStyles } from '../utils/ui';
 import {
   completeWorkOrder as completeDemoWorkOrder,
@@ -43,11 +44,13 @@ type InventoryItem = {
 };
 
 export default function Production() {
+  const navigate = useNavigate();
     // Custom modal state for trace and yield prompt
     const [traceModal, setTraceModal] = useState<{ open: boolean, wo?: WorkOrder }>({ open: false });
     const [yieldModal, setYieldModal] = useState<{ open: boolean, wo?: WorkOrder }>({ open: false });
     const [yieldInput, setYieldInput] = useState('');
     const [modalError, setModalError] = useState('');
+    const [completionModal, setCompletionModal] = useState<{ open: boolean, wo?: WorkOrder, actualYield?: number, wastage?: number, bomName?: string }>({ open: false });
   const [boms, setBoms] = useState<BOM[]>([]);
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
@@ -149,7 +152,8 @@ export default function Production() {
   // Handler for confirming yield modal
   const handleYieldConfirm = async () => {
     const id = yieldModal.wo?.id;
-    if (!id) return;
+    const wo = yieldModal.wo;
+    if (!id || !wo) return;
     let actual_yield: number | undefined = undefined;
     if (yieldInput.trim() !== '') {
       actual_yield = parseInt(yieldInput, 10);
@@ -160,7 +164,16 @@ export default function Production() {
     }
     try {
       await completeDemoWorkOrder(id, actual_yield);
+      const bom = boms.find(b => b.id === wo.bom_id);
+      const resolvedYield = actual_yield ?? wo.target_quantity;
       setYieldModal({ open: false });
+      setCompletionModal({
+        open: true,
+        wo,
+        actualYield: resolvedYield,
+        wastage: Math.max(0, wo.target_quantity - resolvedYield),
+        bomName: bom?.name ?? 'Unknown BOM'
+      });
     } catch (err) {
       setModalError('Failed to complete work order.');
     }
@@ -356,6 +369,141 @@ export default function Production() {
                 <button type="submit" className="px-5 py-2 rounded-lg text-sm font-medium text-white bg-slate-900 hover:bg-slate-800 shadow-sm">Start Order</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Yield Input Modal */}
+      {yieldModal.open && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center">
+          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={handleYieldCancel}></div>
+          <div className="relative z-10 bg-white rounded-xl shadow-2xl w-full max-w-md mx-4">
+            <div className="px-6 py-5 border-b border-slate-200 flex items-center justify-between">
+              <h3 className="text-xl font-bold text-slate-900">Finish & Run Deductions</h3>
+              <button onClick={handleYieldCancel} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-slate-600">Enter the actual units produced for <span className="font-semibold text-slate-900">WO-{String(yieldModal.wo?.id).padStart(4,'0')}</span>. Raw material stock will be deducted automatically.</p>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">
+                  Actual Yield <span className="text-slate-400 font-normal">(leave blank to use target: {yieldModal.wo?.target_quantity.toLocaleString()} units)</span>
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  className="block w-full rounded-md border border-slate-300 py-2.5 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+                  placeholder={String(yieldModal.wo?.target_quantity ?? '')}
+                  value={yieldInput}
+                  onChange={e => { setYieldInput(e.target.value); setModalError(''); }}
+                  autoFocus
+                />
+              </div>
+              {modalError && <p className="text-sm text-red-600 font-medium">{modalError}</p>}
+            </div>
+            <div className="bg-slate-50 px-6 py-4 flex justify-end gap-3 rounded-b-xl border-t border-slate-100">
+              <button type="button" onClick={handleYieldCancel} className="px-4 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-200 border border-slate-300 bg-white">Cancel</button>
+              <button type="button" onClick={handleYieldConfirm} className="px-5 py-2 rounded-lg text-sm font-medium text-white bg-green-700 hover:bg-green-800 shadow-sm flex items-center gap-2">
+                <CheckCircle className="w-4 h-4" /> Confirm & Complete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Post-Completion Next Steps Modal */}
+      {completionModal.open && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center">
+          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm"></div>
+          <div className="relative z-10 bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4">
+            <div className="px-6 py-5 border-b border-slate-200 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-green-50 rounded-lg"><CheckCircle className="w-5 h-5 text-green-600" /></div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">Production Complete!</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">WO-{String(completionModal.wo?.id).padStart(4,'0')} · {completionModal.bomName}</p>
+                </div>
+              </div>
+              <button onClick={() => setCompletionModal({ open: false })} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+            </div>
+
+            <div className="p-6">
+              {/* Summary strip */}
+              <div className="grid grid-cols-3 divide-x divide-slate-100 bg-slate-50 rounded-lg border border-slate-200 mb-6">
+                <div className="px-4 py-3 text-center">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Target</p>
+                  <p className="text-xl font-extrabold text-slate-900">{completionModal.wo?.target_quantity.toLocaleString()}</p>
+                  <p className="text-xs text-slate-400">units</p>
+                </div>
+                <div className="px-4 py-3 text-center">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Actual Yield</p>
+                  <p className="text-xl font-extrabold text-green-700">{completionModal.actualYield?.toLocaleString()}</p>
+                  <p className="text-xs text-slate-400">units</p>
+                </div>
+                <div className="px-4 py-3 text-center">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Loss</p>
+                  <p className={clsx("text-xl font-extrabold", (completionModal.wastage ?? 0) > 0 ? "text-red-600" : "text-slate-900")}>{completionModal.wastage?.toLocaleString()}</p>
+                  <p className="text-xs text-slate-400">units</p>
+                </div>
+              </div>
+
+              {/* Next steps */}
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">What to do next</p>
+              <div className="space-y-2">
+                <button
+                  onClick={() => { setCompletionModal({ open: false }); navigate('/quality'); }}
+                  className="w-full flex items-center gap-4 px-4 py-3.5 rounded-lg border border-slate-200 hover:border-slate-900 hover:bg-slate-50 transition-all group text-left"
+                >
+                  <div className="p-2 bg-blue-50 rounded-lg group-hover:bg-blue-100 transition-colors"><ShieldCheck className="w-5 h-5 text-blue-600" /></div>
+                  <div className="flex-1">
+                    <p className="text-sm font-bold text-slate-900">Run Quality Assurance</p>
+                    <p className="text-xs text-slate-500 mt-0.5">Log QC inspection for this batch before dispatch</p>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-slate-900 transition-colors" />
+                </button>
+
+                <button
+                  onClick={() => { setCompletionModal({ open: false }); navigate('/inventory'); }}
+                  className="w-full flex items-center gap-4 px-4 py-3.5 rounded-lg border border-slate-200 hover:border-slate-900 hover:bg-slate-50 transition-all group text-left"
+                >
+                  <div className="p-2 bg-green-50 rounded-lg group-hover:bg-green-100 transition-colors"><Package className="w-5 h-5 text-green-600" /></div>
+                  <div className="flex-1">
+                    <p className="text-sm font-bold text-slate-900">Check Finished Goods Inventory</p>
+                    <p className="text-xs text-slate-500 mt-0.5">Verify stock was updated and check current levels</p>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-slate-900 transition-colors" />
+                </button>
+
+                <button
+                  onClick={() => { setCompletionModal({ open: false }); setIsWbModalOpen(true); }}
+                  className="w-full flex items-center gap-4 px-4 py-3.5 rounded-lg border border-slate-200 hover:border-slate-900 hover:bg-slate-50 transition-all group text-left"
+                >
+                  <div className="p-2 bg-slate-100 rounded-lg group-hover:bg-slate-200 transition-colors"><ClipboardList className="w-5 h-5 text-slate-600" /></div>
+                  <div className="flex-1">
+                    <p className="text-sm font-bold text-slate-900">Start Another Work Order</p>
+                    <p className="text-xs text-slate-500 mt-0.5">Queue the next production batch</p>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-slate-900 transition-colors" />
+                </button>
+
+                <button
+                  onClick={() => { setCompletionModal({ open: false }); navigate('/reports'); }}
+                  className="w-full flex items-center gap-4 px-4 py-3.5 rounded-lg border border-slate-200 hover:border-slate-900 hover:bg-slate-50 transition-all group text-left"
+                >
+                  <div className="p-2 bg-purple-50 rounded-lg group-hover:bg-purple-100 transition-colors"><BarChart2 className="w-5 h-5 text-purple-600" /></div>
+                  <div className="flex-1">
+                    <p className="text-sm font-bold text-slate-900">View Production Reports</p>
+                    <p className="text-xs text-slate-500 mt-0.5">Review yield trends and factory analytics</p>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-slate-900 transition-colors" />
+                </button>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 px-6 py-4 rounded-b-xl border-t border-slate-100 flex justify-end">
+              <button onClick={() => setCompletionModal({ open: false })} className="px-4 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-200 border border-slate-300 bg-white">
+                Done
+              </button>
+            </div>
           </div>
         </div>
       )}
