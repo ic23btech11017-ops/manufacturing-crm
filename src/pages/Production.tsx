@@ -284,53 +284,6 @@ export default function Production() {
                           >
                             <CheckCircle className="w-4 h-4 text-slate-600" /> Trace Batch #{wo.id}
                           </button>
-                              {/* Yield Modal for Completing Work Order */}
-                              {yieldModal.open && (
-                                <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto">
-                                  <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={handleYieldCancel}></div>
-                                  <div className="relative z-10 bg-white rounded-xl shadow-2xl w-full max-w-md mx-4">
-                                    <div className="px-6 py-5 border-b border-slate-200">
-                                      <h3 className="text-xl font-bold text-slate-900">Execute Work Order</h3>
-                                      <p className="text-sm text-slate-500 mt-1">Please enter the <b>ACTUAL yield</b> out of Production (to trace wastage/loss). Leave blank to use target quantity.</p>
-                                    </div>
-                                    <div className="p-6 space-y-4">
-                                      <input
-                                        type="number"
-                                        className="block w-full rounded-md border border-slate-300 py-2.5 px-3 text-sm focus:ring-slate-900"
-                                        placeholder="Actual yield (leave blank for target)"
-                                        value={yieldInput}
-                                        onChange={e => setYieldInput(e.target.value)}
-                                      />
-                                      {modalError && <div className="text-sm text-red-600">{modalError}</div>}
-                                    </div>
-                                    <div className="bg-slate-50 px-6 py-4 flex justify-end gap-3 rounded-b-xl border-t border-slate-100">
-                                      <button type="button" onClick={handleYieldCancel} className="px-4 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-200 border border-slate-300 bg-white">Cancel</button>
-                                      <button type="button" onClick={handleYieldConfirm} className="px-5 py-2 rounded-lg text-sm font-medium text-white bg-slate-900 hover:bg-slate-800 shadow-sm">Confirm</button>
-                                    </div>
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* Trace Modal for Batch Trace Link */}
-                              {traceModal.open && (
-                                <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto">
-                                  <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={handleTraceClose}></div>
-                                  <div className="relative z-10 bg-white rounded-xl shadow-2xl w-full max-w-md mx-4">
-                                    <div className="px-6 py-5 border-b border-slate-200">
-                                      <h3 className="text-xl font-bold text-slate-900">Batch Trace Link</h3>
-                                    </div>
-                                    <div className="p-6 space-y-2">
-                                      <div className="text-sm text-slate-700 font-semibold">WO ID: {traceModal.wo?.id}</div>
-                                      <div className="text-sm text-slate-700">Target: {traceModal.wo?.target_quantity}</div>
-                                      <div className="text-sm text-slate-700">Yield: {traceModal.wo?.actual_yield ?? '-'}</div>
-                                      <div className="text-sm text-slate-700">Raw Materials Consumed: <span className="font-mono">View full stock movements tab for WO-{traceModal.wo?.id}</span></div>
-                                    </div>
-                                    <div className="bg-slate-50 px-6 py-4 flex justify-end gap-3 rounded-b-xl border-t border-slate-100">
-                                      <button type="button" onClick={handleTraceClose} className="px-4 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-200 border border-slate-300 bg-white">Close</button>
-                                    </div>
-                                  </div>
-                                </div>
-                              )}
                         )}
                       </div>
                     </div>
